@@ -700,11 +700,13 @@ TOBODY:     JMP     ENTER
 ;
 ; a-addr is the address of a cell containing the offset in characters
 ; from the start of the input buffer to the start of the parse area.
+;
+; ---
+; : >IN ( -- a-addr)  ICB ICBTOIN + ;
 
             LINKTO(TOBODY,0,3,'N',"I>")
-TOIN:       LXI     H,TICKTOIN
-            PUSH    H
-            NEXT
+TOIN:       JMP     ENTER
+            .WORD   ICB,LIT,ICBTOIN,PLUS,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -1360,13 +1362,14 @@ EMIT:       POP     H           ; Pop the character into HL
 ; When the parse area is empty, restore the prior input source specification.
 ; Other stack effects are due to the words EVALUATEd.
 ;
-; TODO CORE-EXT: Clear SOURCE-ID when we have SOURCE-ID.
-;
-; : EVALUATE ( i*x c-addr u -- j*x)   INTERPRET ;
+; : EVALUATE ( i*x c-addr u -- j*x)
+;   PUSHICB  OVER + ICB 2!  -1 ICB ICBSOURCEID + !  INTERPRET  POPICB ;
 
             LINKTO(EMIT,0,8,'E',"TAULAVE")
 EVALUATE:   JMP     ENTER
-            .WORD   INTERPRET,EXIT
+            .WORD   PUSHICB,OVER,PLUS,ICB,TWOSTORE
+            .WORD   LIT,-1,ICB,LIT,ICBSOURCEID,PLUS,STORE
+            .WORD   INTERPRET,POPICB,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -1873,14 +1876,11 @@ _postpone3: .WORD   EXIT
 ;     state, all processing has been completed, and no ambiguous condition
 ;     exists.
 ;
-; TODO CORE-EXT: Clear SOURCE-ID when we have SOURCE-ID.
-; TODO: "make the user input device the input source".
-;
 ; : QUIT  ( --; R: i*x --)
-;   INITRP  0 STATE !
+;   INITRP  0 STATE !  INIT-ICBS  TIB  ICB ICBLINESTART +  !
 ;   BEGIN
-;       TIB DUP TIBSIZE  ACCEPT  SPACE
-;       INTERPRET
+;       TIB TIBSIZE  ACCEPT  TIB +  ICB ICBLINEEND + !
+;       SPACE INTERPRET
 ;       CR  STATE @ 0= IF ." ok " THEN
 ;   AGAIN ;
 
@@ -1888,8 +1888,10 @@ _postpone3: .WORD   EXIT
 QUIT:       JMP     ENTER
             .WORD   INITRP
             .WORD   ZERO,STATE,STORE
-_quit1:     .WORD   TIB,DUP,LIT,TIBSIZE,ACCEPT,SPACE
-            .WORD   INTERPRET
+            .WORD   INITICBS,TIB,ICB,LIT,ICBLINESTART,PLUS,STORE
+_quit1:     .WORD   TIB,LIT,TIBSIZE,ACCEPT
+            .WORD   TIB,PLUS,ICB,LIT,ICBLINEEND,PLUS,STORE
+            .WORD   SPACE,INTERPRET
             .WORD   CR,STATE,FETCH,ZEROEQUALS,zbranch,_quit2
             .WORD   PSQUOTE,3
             .BYTE   "ok "
@@ -2086,11 +2088,13 @@ SMSLASHREM: JMP     ENTER
 ;
 ; c-addr is the address of, and u is the number of characters in, the
 ; input buffer.
+;
+; ---
+; : SOURCE ( -- c-addr u)   ICB 2@ OVER - ;
 
-            LINKTO(SMSLASHREM,0,5,'E',"CRUOS")
-SOURCE:     SAVEDE
-            LXI     D,TICKSOURCE
-            JMP     _twofetchDE
+            LINKTO(SMSLASHREM,0,6,'E',"CRUOS")
+SOURCE:     JMP     ENTER
+            .WORD   ICB,TWOFETCH,OVER,MINUS,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -2313,7 +2317,7 @@ MPYX3:      DCR     C           ; IF NOT LAST MPLIER BIT
 ; getting saved since that is the fig-FORTH Instruction Pointer.  The fig-FORTH
 ; comments are unchanged, so replace "IP" with "RSP".
 
-            LINKTO(UDSLASHMOD,0,6,'D',"OM/MU")
+            LINKTO(UMSTAR,0,6,'D',"OM/MU")
 UMSLASHMOD: SAVEDE
 
             ; fig-FORTH code:
@@ -2592,7 +2596,7 @@ BRACKETTICK:JMP     ENTER
 
 ; : [CHAR] ( "<spaces>name" -- char)   CHAR  ['] LIT COMPILE,  , ; IMMEDIATE
 
-            LINKTO(TONUMBER,1,6,']',"RAHC[")
+            LINKTO(BRACKETTICK,1,6,']',"RAHC[")
 BRACKETCHAR:JMP     ENTER
             .WORD   CHAR,LIT,LIT,COMPILECOMMA,COMMA,EXIT
 
@@ -2610,6 +2614,21 @@ RTBRACKET:  LXI     H,0FFFFh
 
 
 ; ======================================================================
+; CORE Constants (implementation details)
+; ======================================================================
+
+; ----------------------------------------------------------------------
+; Input Control Block
+;
+; Stores information about an input source.
+
+ICBLINEEND: .EQU    0           ; Offset to end of line.
+ICBLINESTART:.EQU   2           ; Offset from FCB to start of line cell.
+ICBSOURCEID:.EQU    4           ; Offset to SOURCE-ID for this source.
+ICBTOIN:    .EQU    6           ; Offset to >IN value.
+
+
+; ======================================================================
 ; CORE Words (implementation details)
 ; ======================================================================
 
@@ -2618,7 +2637,7 @@ RTBRACKET:  LXI     H,0FFFFh
 ;
 ; addr is the address of the start of the WORD buffer.
 
-            LINKTO(COMMA,0,5,'D',"ROW\'")
+            LINKTO(RTBRACKET,0,5,'D',"ROW\'")
 TICKWORD:   LHLD    DP
             PUSH    D
             LXI     D,WORDOFFSET
@@ -2638,7 +2657,7 @@ TICKWORD:   LHLD    DP
 ; loop control parameters are discarded.  An ambiguous condition exists if
 ; n1|u1 and n2|u2 are not both of the same type.
 
-            LINKTO(pdo,0,5,029h,"od?(")
+            LINKTO(TICKWORD,0,5,029h,"od?(")
 pqdo:       SAVEDE
             POP     H           ; Pop index into HL.
             POP     D           ; Pop limit into DE.
@@ -2669,7 +2688,7 @@ _pqdoDONE:  NEXT
 ; Anything already on the return stack becomes unavailable until the
 ; loop-control parameters are discarded.
 
-            LINKTO(zbranch,0,4,029h,"od(")
+            LINKTO(pqdo,0,4,029h,"od(")
 pdo:        POP     H           ; Pop index into HL,
             XTHL                ; ..swap the index and the limit,
             RSPUSH(H,L)         ; ..and push the limit onto the return stack.
@@ -2687,7 +2706,7 @@ pdo:        POP     H           ; Pop index into HL,
 ; execution at the beginning of the loop.  Otherwise, discard the current
 ; loop control parameters and continue execution immediately following the loop.  
 
-            LINKTO(ploop,0,7,029h,"pool+(")
+            LINKTO(pdo,0,7,029h,"pool+(")
 pplusloop:  SAVEDE
             RSPOP(H,L)          ; Get the current loop index from the RS.
             POP     D           ; Get the increment from the stack.
@@ -2733,7 +2752,7 @@ _pplDONE:   NEXT
 ; immediately following the loop.  Otherwise continue execution at the
 ; beginning of the loop.
 
-            LINKTO(pqdo,0,6,029h,"pool(")
+            LINKTO(pplusloop,0,6,029h,"pool(")
 ploop:      SAVEDE
             RSPOP(H,L)          ; Get the current loop index from the RS
             INX     H           ; ..and increment the loop index.
@@ -2761,7 +2780,7 @@ _ploopDONE: NEXT
 ;
 ; Runtime behavior of S": return c-addr and u.
 
-            LINKTO(VARIABLE,0,4,029h,"\"s(")
+            LINKTO(ploop,0,4,029h,"\"s(")
 PSQUOTE:    LHLX                ; Read string count from instruction stream.
             INX     D           ; Skip over count
             INX     D           ; ..in instruction stream.
@@ -2778,7 +2797,7 @@ PSQUOTE:    LHLX                ; Read string count from instruction stream.
 ;
 ; Push zero onto the stack.
 
-            LINKTO(TWOSTAR,0,1,'0',"")
+            LINKTO(PSQUOTE,0,1,'0',"")
 ZERO:       LXI     H,0
             PUSH    H
             NEXT
@@ -2791,7 +2810,7 @@ ZERO:       LXI     H,0
 ; in the next cell of the instruction stream, otherwise skip over the branch
 ; address and continue processing instructions.
 
-            LINKTO(branch,0,7,'h',"cnarb0")
+            LINKTO(ZERO,0,7,'h',"cnarb0")
 zbranch:    POP     H           ; Get the flag.
             MOV     A,H         ; See if the flag is zero by moving H to A
             ORA     L           ; ..and then ORing A with L.
@@ -2809,7 +2828,7 @@ _zbraDONE:  NEXT
 ;
 ; Push one onto the stack.
 
-            LINKTO(STAR,0,1,'1',"")
+            LINKTO(zbranch,0,1,'1',"")
 ONE:        LXI     H,1
             PUSH    H
             NEXT
@@ -2822,7 +2841,7 @@ ONE:        LXI     H,1
 ;
 ; >DIGIT ( u -- c ) DUP 9 > 7 AND + 48 + ;
 
-            LINKTO(MPLUS,0,6,'T',"IGID>")
+            LINKTO(ONE,0,6,'T',"IGID>")
 TODIGIT:    POP     H
             MOV     A,L
             CPI     00Ah
@@ -2841,7 +2860,7 @@ _todigit2:  ADI     030h
 ;
 ; : ?DNEGATE ( d1 n -- d2)   0< IF DNEGATE THEN ;
 
-            LINKTO(WHILE,0,8,'E',"TAGEND?")
+            LINKTO(TODIGIT,0,8,'E',"TAGEND?")
 QDNEGATE:   JMP     ENTER
             .WORD   ZEROLESS,zbranch,_dnegate1,DNEGATE
 _dnegate1:  .WORD   EXIT
@@ -2866,7 +2885,7 @@ _negate1:   .WORD   EXIT
 ; Set the instruction pointer to the address that is in the next cell of
 ; the instruction stream.
 
-            LINKTO(WORD,0,6,'h',"cnarb")
+            LINKTO(QNEGATE,0,6,'h',"cnarb")
 branch:     LHLX                ; Get the branch address into HL.
             XCHG                ; Swap the branch address into DE.
             NEXT
@@ -2879,7 +2898,7 @@ branch:     LHLX                ; Get the branch address into HL.
 ; Pushes the numeric value and -1 to the stack if the value was converted,
 ; otherwise pushes 0 to the stack.
 
-            LINKTO(DECIMAL,0,6,'?',"TIGID")
+            LINKTO(branch,0,6,'?',"TIGID")
 DIGITQ:     MOV     H,B         ; Get the contents
             MVI     L,USERBASE  ; ..of the BASE
             MOV     L,M         ; ..user variable in L.
@@ -2939,7 +2958,7 @@ ENDLOOP:    JMP     ENTER
 ; compare the length separately though, as otherwise the immediate bit
 ; would look like the terminal bit.
 
-            LINKTO(FIND,0,6,'?',"DNUOF")
+            LINKTO(DIGITQ,0,6,'?',"DNUOF")
 FOUNDQ:     SAVEDE
             POP     D           ; Pop the dictionary pointer.
             POP     H           ; Pop the counted string pointer.
@@ -2986,7 +3005,7 @@ _foundqDONE:PUSH    H           ; Push the flag to the stack.
 ; HERE>CHAIN ( addr -- )
 ;   BEGIN ?DUP WHILE DUP @ HERE ( a a' h) ROT ! REPEAT ;
 
-            LINKTO(ELSE,0,10,'N',"IAHC>EREH")
+            LINKTO(FOUNDQ,0,10,'N',"IAHC>EREH")
 HERETOCHAIN:JMP     ENTER
 _htc1:      .WORD   QDUP,zbranch,_htc2
             .WORD   DUP,FETCH,HERE,ROT,STORE,branch,_htc1
@@ -3000,7 +3019,7 @@ _htc2:      .WORD   EXIT
 ;
 ; : HIDDEN ( dict-addr -- f )   C@ 64 AND 0<> ;
 
-            LINKTO(HIDE,0,7,'?',"NEDDIH")
+            LINKTO(HERETOCHAIN,0,7,'?',"NEDDIH")
 HIDDENQ:    JMP     ENTER
             .WORD   CFETCH,LIT,64,AND,ZERONOTEQUALS,EXIT
 
@@ -3010,7 +3029,7 @@ HIDDENQ:    JMP     ENTER
 ;
 ; Prevent the most recent definition from being found in the dictionary.
 
-            LINKTO(FOUNDQ,0,4,'E',"DIH")
+            LINKTO(HIDDENQ,0,4,'E',"DIH")
 HIDE:       LHLD    TICKLATEST
             MOV     A,M
             ORI     01000000b
@@ -3024,19 +3043,45 @@ HIDE:       LHLD    TICKLATEST
 ; c-addr is the address of the cell containing the current location in
 ; the Pictured Numeric Output hold buffer.
 
-            LINKTO(NUMSIGNS,0,3,'D',"LH")
+            LINKTO(HIDE,0,3,'D',"LH")
 HLD:        LXI     H,TICKHLD
             PUSH    H
             NEXT
 
 
 ; ----------------------------------------------------------------------
+; ICB [MFORTH] "i-c-b" ( -- c-addr )
+;
+; c-addr is the address of the current Input Control Block.
+
+            LINKTO(HLD,0,3,'B',"CI")
+ICB:        LHLD    TICKICB
+            PUSH    H
+            NEXT
+
+
+; ----------------------------------------------------------------------
+; INIT-ICBS [MFORTH] "init-icbs" ( -- )
+;
+; Initialize all of the Input Control Blocks.  The current Input Control
+; Block should be configured immediately after executing this word.
+;
+; : INIT-ICBS ( -- )
+;   ICBSTART [ MAXICBS 2* 2* 2* ] 0 FILL  ICBSTART TO ICB ;
+
+            LINKTO(ICB,0,9,'S',"BCF-TINI")
+INITICBS:   JMP     ENTER
+            .WORD   LIT,ICBSTART,LIT,MAXICBS*8,ZERO,FILL
+            .WORD   LIT,ICBSTART,LIT,TICKICB,STORE,EXIT
+
+
+; ----------------------------------------------------------------------
 ; INTERPRET [MFORTH] ( i*x c-addr u -- j*x )
 ;
-; Interpret the given string.
+; Interpret the line in the current Input Control Block.
 ;
-; : INTERPRET ( i*x c-addr u -- j*x )
-;   'SOURCE 2!  0 >IN !
+; : INTERPRET ( i*x -- j*x )
+;   0 >IN !
 ;   BEGIN
 ;   BL WORD DUP C@ WHILE        -- textadr
 ;       FIND                    -- a 0/1/-1
@@ -3054,9 +3099,9 @@ HLD:        LXI     H,TICKHLD
 ;       THEN
 ;   REPEAT DROP ;
 
-            LINKTO(INSROMTRIG,0,9,'T',"ERPRETNI")
+            LINKTO(INITICBS,0,9,'T',"ERPRETNI")
 INTERPRET:  JMP     ENTER
-            .WORD   LIT,TICKSOURCE,TWOSTORE,ZERO,TOIN,STORE
+            .WORD   ZERO,TOIN,STORE
 _interpret1:.WORD   BL,WORD,DUP,CFETCH,zbranch,_interpret6
             .WORD   FIND,QDUP,zbranch,_interpret3
             .WORD   ONEPLUS,STATE,FETCH,ZEROEQUALS,OR,zbranch,_interpret2
@@ -3077,7 +3122,7 @@ _interpret6:.WORD   DROP
 ; a-addr is the address of a cell containing the address of the link
 ; field of the latest word added to the dictionary.
 
-            LINKTO(IMMEDIATE,0,6,'T',"SETAL")
+            LINKTO(INTERPRET,0,6,'T',"SETAL")
 LATEST:     LXI     H,TICKLATEST
             PUSH    H
             NEXT
@@ -3088,7 +3133,7 @@ LATEST:     LXI     H,TICKLATEST
 ;
 ; Push the next value in the PFA to the stack.
 
-            LINKTO(DUP,0,3,'T',"IL")
+            LINKTO(LATEST,0,3,'T',"IL")
 LIT:        LHLX            ; Read constant from instruction stream.
             PUSH    H       ; ..and push constant to stack.
             INX     D       ; Skip over constant
@@ -3108,7 +3153,7 @@ LIT:        LHLX            ; Read constant from instruction stream.
 ;   IF DROP 2DROP  R> DROP  0 ELSE
 ;      DROP 2NIP DROP  >R ?NEGATE  -1 THEN ;
 
-            LINKTO(HEX,0,7,'?',"REBMUN")
+            LINKTO(LIT,0,7,'?',"REBMUN")
 NUMBERQ:    JMP     ENTER
             .WORD   SIGNQ,TOR,TWODUP,ZERO,ZERO,TWOSWAP
             .WORD       TONUMBER,zbranch,_numberq1
@@ -3118,11 +3163,37 @@ _numberq2:  .WORD   EXIT
 
 
 ; ----------------------------------------------------------------------
+; POPICB [MFORTH] "push-i-c-b" ( -- )
+;
+; Point ICB at the previous Input Control Block.
+;
+; ---
+; : POPICB ( --)  ICB 8 - TO ICB ;
+
+            LINKTO(NUMBERQ,0,6,'B',"CIPOP")
+POPICB:     JMP     ENTER
+            .WORD   ICB,LIT,8,MINUS,LIT,TICKICB,STORE,EXIT
+
+
+; ----------------------------------------------------------------------
+; PUSHICB [MFORTH] "push-i-c-b" ( -- )
+;
+; Point ICB at the next Input Control Block.
+;
+; ---
+; : PUSHICB ( --)  ICB 8 + TO ICB ;
+
+            LINKTO(POPICB,0,7,'B',"CIHSUP")
+PUSHICB:    JMP     ENTER
+            .WORD   ICB,LIT,8,PLUS,LIT,TICKICB,STORE,EXIT
+
+
+; ----------------------------------------------------------------------
 ; REVEAL [MFORTH] ( -- )
 ;
 ; Allow the most recent definition to be found in the dictionary.
 
-            LINKTO(POSTPONE,0,6,'L',"AEVER")
+            LINKTO(PUSHICB,0,6,'L',"AEVER")
 REVEAL:     LHLD    TICKLATEST
             MOV     A,M
             ANI     10111111b
@@ -3143,7 +3214,7 @@ REVEAL:     LHLD    TICKLATEST
 ;       [CHAR] - = IF -1 ELSE 0 THEN  >R 1 /STRING R>
 ;   ELSE DROP 0 THEN ;
 
-            LINKTO(SQUOTE,0,5,'?',"NGIS")
+            LINKTO(REVEAL,0,5,'?',"NGIS")
 SIGNQ:      JMP     ENTER
             .WORD   OVER,CFETCH,DUP,LIT,'-',EQUALS,OVER,LIT,'+',EQUALS,OR
             .WORD       zbranch,_signq3
@@ -3161,7 +3232,7 @@ _signq4:    .WORD   EXIT
 ;
 ; UD* ( ud1 u1 -- ud2)   DUP >R UM* DROP  SWAP R> UM* ROT + ;
 
-            LINKTO(STOD,0,3,'*',"DU")
+            LINKTO(SIGNQ,0,3,'*',"DU")
 UDSTAR:     JMP     ENTER
             .WORD   DUP,TOR,UMSTAR,DROP
             .WORD   SWAP,RFROM,UMSTAR,ROT,PLUS
@@ -3175,7 +3246,7 @@ UDSTAR:     JMP     ENTER
 
 ; : UD. ( ud -- )   <# #S #> TYPE SPACE ;
 
-            LINKTO(UDOT,0,3,'.',"DU")
+            LINKTO(UDSTAR,0,3,'.',"DU")
 UDDOT:      JMP     ENTER
             .WORD   LESSNUMSIGN,NUMSIGNS,NUMSIGNGRTR,TYPE,SPACE
             .WORD   EXIT
@@ -3188,7 +3259,7 @@ UDDOT:      JMP     ENTER
 ;
 ; UD/MOD ( ud1 u1 -- n ud2 )   >R 0 R@ UM/MOD  R> SWAP >R UM/MOD R> ;
 
-            LINKTO(UMSTAR,0,6,'D',"OM/DU")
+            LINKTO(UDDOT,0,6,'D',"OM/DU")
 LAST_CORE:
 UDSLASHMOD: JMP     ENTER
             .WORD   TOR,ZERO,RFETCH,UMSLASHMOD

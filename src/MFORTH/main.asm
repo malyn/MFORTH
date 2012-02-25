@@ -171,6 +171,7 @@ WORDSIZE:   .EQU    258         ; Size of WORD buffer.
 HLDEND:     .EQU    WORDOFFSET+WORDSIZE ; End (and thus, start) of HLD.
 PADOFFSET:  .EQU    HLDEND      ; Offset from HERE to first PAD buffer.
 PADSIZE     .EQU    256         ; Size of each task's PAD buffer.
+MAXICBS     .EQU    8           ; Maximum number of active input sources.
 MAXFCBS     .EQU    8           ; Maximum number of files open at one time.
 
 
@@ -207,18 +208,18 @@ BOPSTK:     .EQU    ALTBGN + 26 ; Initial value of SP on entry to MFORTH.
 TICKLATEST: .EQU    ALTBGN + 28 ; Pointer to the latest word added to the dict.
 TICKSTATE:  .EQU    ALTBGN + 30 ; Compilation-state flag.
 TICKTIB:    .EQU    ALTBGN + 32 ; Terminal Input Buffer pointer.
-TICKTOIN:   .EQU    ALTBGN + 34 ; >IN
-TICKSOURCE: .EQU    ALTBGN + 36 ; SOURCE (two cells)
-TICKHLD:    .EQU    ALTBGN + 40 ; Pictured Numeric Output hold pointer.
-TICKNUMTASKS:.EQU   ALTBGN + 42 ; Number of tasks
-TICKFIRSTTASK:.EQU  ALTBGN + 44 ; Address of the first task (always XX00)
-TICKNUMUSERVARS:.EQU ALTBGN+ 46 ; Number of USER variables
-SAVED:      .EQU    ALTBGN + 48 ; DE is saved here when used as a temporary.
-TICKPREVLEAVE:.EQU  ALTBGN + 50 ; Pointer to the previous LEAVE in a DO..LOOP.
-TICKPREVENDB:.EQU   ALTBGN + 52 ; Pointer to the previous ?ENDB in a FORB..NEXTB
-; 10 bytes free.
-FCBSTART    .EQU    ALTBGN + 64 ; Start of the 8, 8-byte File Control Blocks.
-; 192 bytes free.
+TICKHLD:    .EQU    ALTBGN + 34 ; Pictured Numeric Output hold pointer.
+TICKNUMTASKS:.EQU   ALTBGN + 36 ; Number of tasks
+TICKFIRSTTASK:.EQU  ALTBGN + 38 ; Address of the first task (always XX00)
+TICKNUMUSERVARS:.EQU ALTBGN+ 40 ; Number of USER variables
+SAVED:      .EQU    ALTBGN + 42 ; DE is saved here when used as a temporary.
+TICKPREVLEAVE:.EQU  ALTBGN + 44 ; Pointer to the previous LEAVE in a DO..LOOP.
+TICKPREVENDB:.EQU   ALTBGN + 46 ; Pointer to the previous ?ENDB in a FORB..NEXTB
+TICKICB:    .EQU    ALTBGN + 48 ; Address of the current Input Control Block.
+; 14 bytes free.
+ICBSTART:   .EQU    ALTBGN + 64 ; Start of the 8, 8-byte Input Control Blocks.
+FCBSTART:   .EQU    ALTBGN + 128; Start of the 8, 8-byte File Control Blocks.
+; 128 bytes free.
 
 
 

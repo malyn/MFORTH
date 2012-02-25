@@ -30,28 +30,6 @@
 ; ======================================================================
 
 ; ----------------------------------------------------------------------
-; File Control Block
-;
-; Stores information about an open file.  The elements are ordered such
-; that 2@ on an FCB will put END and POS on the stack in that order.  You
-; can then calculate the remaining bytes in the file (the most common
-; operation on an FCB if you assume that READ-* is the most commonly-called
-; FILE word) with "2@ -" and without any indexing into the FCB.  This is
-; also the reason that we store the end address of the file instead of the
-; length of the file; we only need the length for FILE-SIZE, but we need
-; the end address for every READ-* (to ensure that we do not read past the
-; end of the file).  Finally, storing POS first means that you can access
-; the absolute file position without having to adjust the FCB address.  In
-; other words, an FCB address is also the address of the POS cell for that
-; FCB.
-
-FCBPOS:     .EQU    0           ; Offset from FCB to position in file.
-FCBEND:     .EQU    2           ; Offset to end address of file.
-FCBADDR:    .EQU    4           ; Offset to address of file.
-FCBGENNUM:  .EQU    6           ; Offset to generation number.
-
-
-; ----------------------------------------------------------------------
 ; I/O Result Codes
 ;
 IOROK       .EQU    0           ; No error.
@@ -447,6 +425,32 @@ WRITEFILE:  JMP     ENTER
 WRITELINE:  JMP     ENTER
             .WORD   DROP,TWODROP,LIT,IORRDONLY,EXIT
 
+
+
+; ======================================================================
+; FILE Constants (implementation details)
+; ======================================================================
+
+; ----------------------------------------------------------------------
+; File Control Block
+;
+; Stores information about an open file.  The elements are ordered such
+; that 2@ on an FCB will put END and POS on the stack in that order.  You
+; can then calculate the remaining bytes in the file (the most common
+; operation on an FCB if you assume that READ-* is the most commonly-called
+; FILE word) with "2@ -" and without any indexing into the FCB.  This is
+; also the reason that we store the end address of the file instead of the
+; length of the file; we only need the length for FILE-SIZE, but we need
+; the end address for every READ-* (to ensure that we do not read past the
+; end of the file).  Finally, storing POS first means that you can access
+; the absolute file position without having to adjust the FCB address.  In
+; other words, an FCB address is also the address of the POS cell for that
+; FCB.
+
+FCBPOS:     .EQU    0           ; Offset from FCB to position in file.
+FCBEND:     .EQU    2           ; Offset to end address of file.
+FCBADDR:    .EQU    4           ; Offset to address of file.
+FCBGENNUM:  .EQU    6           ; Offset to generation number.
 
 
 ; ======================================================================

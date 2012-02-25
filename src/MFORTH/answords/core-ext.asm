@@ -137,7 +137,7 @@ HEX:        JMP     ENTER
 ;
 ; Drop the first item below the top of stack.
 
-            LINKTO(LIT,0,3,'P',"IN")
+            LINKTO(HEX,0,3,'P',"IN")
 NIP:        POP     H           ; Pop x2 into HL.
             POP     PSW         ; Pop x1 into A+PSW.
             PUSH    H           ; Push x2 back onto the stack.
@@ -152,7 +152,7 @@ NIP:        POP     H           ; Pop x2 into HL.
 ;
 ; : PAD ( -- c-addr)   HERE  PADOFFSET +  TASK 'FIRSTTASK @ -  8 LSHIFT  + ;
 
-            LINKTO(HEX,0,3,'D',"AP")
+            LINKTO(NIP,0,3,'D',"AP")
 PAD:        PUSH    D           ; Save DE.
             LHLD    DP          ; Get HERE into HL.
             LXI     D,PADOFFSET ; Get the base PAD offset into DE
@@ -190,6 +190,26 @@ PICK:       POP     H           ; Get u into HL,
 
 
 ; ----------------------------------------------------------------------
+; SOURCE-ID [CORE EXT] 6.2.2218 "source-i-d" ( -- 0 | -1 )
+;
+; Identifies the input source as follows:
+;
+;   =================================
+;   SOURCE-ID	Input source
+;   ---------------------------------
+;       -1      String (via EVALUATE)
+;        0      User input device
+;   =================================
+;
+; ---
+; : SOURCE-ID ( -- 0 | -1)   ICB ICBSOURCEID + @ ;
+
+            LINKTO(PICK,0,9,'D',"I-ECRUOS")
+SOURCEID:   JMP     ENTER
+            .WORD   ICB,LIT,ICBSOURCEID,PLUS,FETCH,EXIT
+
+
+; ----------------------------------------------------------------------
 ; TIB [CORE EXT] 6.2.2290 "t-i-b" ( -- c-addr )
 ;
 ; c-addr is the address of the terminal input buffer.
@@ -197,11 +217,10 @@ PICK:       POP     H           ; Get u into HL,
 ; Note: This word is obsolescent and is included as a concession to
 ; existing implementations.
 
-            LINKTO(PICK,0,3,'B',"IT")
+            LINKTO(SOURCEID,0,3,'B',"IT")
 TIB:        LHLD    TICKTIB
             PUSH    H
             NEXT
-
 
 
 ; ----------------------------------------------------------------------
