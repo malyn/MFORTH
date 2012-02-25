@@ -326,16 +326,19 @@ _readfile1: .WORD   DUP,TOR,FETCH,DASHROT,COPY,RFETCH,TWOFETCH,MINUS,MIN
 ; position after the last character read.
 ;
 ; ---
-; : READ-LINE ( c-addr u1 fileid -- u2 ior)
+; : READ-LINE ( c-addr u1 fileid -- u2 flag ior)
 ;   FILEID>FCB? ?DUP IF NIP NIP 0 SWAP EXIT THEN  ( ca u1 fcb)
+;   DUP 2@ - 0= IF DROP 2DROP 0 0 IOROK EXIT THEN
 ;   DUP >R @ ( ca u1 pos R:fcb) -ROT COPY-LINE ( u2 cnt R:fcb)
-;   R> +! IOROK ;
+;   R> +! -1 IOROK ;
 
             LINKTO(READFILE,0,9,'E',"NIL-DAER")
 READLINE:    JMP    ENTER
             .WORD   FILEIDTOFCBQ,QDUP,zbranch,_readline1,NIP,NIP,ZERO,SWAP,EXIT
-_readline1: .WORD   DUP,TOR,FETCH,DASHROT,COPYLINE
-            .WORD   RFROM,PLUSSTORE,LIT,IOROK,EXIT
+_readline1: .WORD   DUP,TWOFETCH,MINUS,ZEROEQUALS,zbranch,_readline2
+            .WORD       DROP,TWODROP,ZERO,ZERO,LIT,IOROK,EXIT
+_readline2: .WORD   DUP,TOR,FETCH,DASHROT,COPYLINE
+            .WORD   RFROM,PLUSSTORE,LIT,-1,LIT,IOROK,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -349,12 +352,13 @@ _readline1: .WORD   DUP,TOR,FETCH,DASHROT,COPYLINE
 ;
 ; ---
 ; : REPOSITION-FILE ( ud fileid -- ior)
-;   FILEID>FCB? ?DUP IF EXIT THEN  +!  IOROK ;
+;   FILEID>FCB? IF EXIT THEN  DUP  FCBADDR + @ ROT +  SWAP !  IOROK ;
 
             LINKTO(READLINE,0,15,'E',"LIF-NOITISOPER")
 REPOSFILE:   JMP    ENTER
-            .WORD   FILEIDTOFCBQ,QDUP,zbranch,_reposfile,EXIT
-_reposfile: .WORD   PLUSSTORE,LIT,IOROK,EXIT
+            .WORD   FILEIDTOFCBQ,zbranch,_reposfile,EXIT
+_reposfile: .WORD   DUP,LIT,FCBADDR,PLUS,FETCH,ROT,PLUS,SWAP,STORE
+            .WORD   LIT,IOROK,EXIT
 
 
 ; ----------------------------------------------------------------------
