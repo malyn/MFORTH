@@ -3143,6 +3143,11 @@ _pfindNEXTWORD:INXNFATOLFA(D)   ; Move to the word's LFA,
             LHLX                ; ..get the LFA in HL,
             XCHG                ; ..put the LFA into DE,
             LHLD    HOLDH       ; ..and restore HL.
+#IFDEF PHASH
+            MOV     A,D         ; The phash routine ignores the LFA, so
+            ANI     80h         ; ..see if we are in ROM and
+            JZ      _pfindPHASH ; ..continue the phash process if so.
+#ENDIF
             MOV     A,D         ; Keep searching for a match
             ORA     E           ; ..if the LFA
             JNZ     _pfindAGAIN ; ..is not zero.
