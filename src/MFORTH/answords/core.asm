@@ -100,12 +100,12 @@ _numsigns2: .WORD   EXIT
 ; When interpreting, ' xyz EXECUTE is equivalent to xyz.
 ;
 ; : ' ( "<spaces>name" -- xt)
-;   BL WORD FIND  0= IF COUNT TYPE SPACE [CHAR] ? EMIT CR ABORT THEN ;
+;   PARSE-WORD (FIND)  0= IF TYPE SPACE [CHAR] ? EMIT CR ABORT THEN ;
 
             LINKTO(NUMSIGNS,0,1,027h,"")
 TICK:       JMP     ENTER
-            .WORD   BL,WORD,FIND,ZEROEQUALS,zbranch,_tick1
-            .WORD   COUNT,TYPE,SPACE,LIT,'?',EMIT,CR,ABORT
+            .WORD   PARSEWORD,PFIND,ZEROEQUALS,zbranch,_tick1
+            .WORD   TYPE,SPACE,LIT,'?',EMIT,CR,ABORT
 _tick1:     .WORD   EXIT
 
 
@@ -1440,152 +1440,14 @@ _fill2:     .WORD   DROP,EXIT
 ; those returned while not compiling.
 ;
 ; ---
-; MFORTH's FIND word traverses the dictionary's linked list until the
-; traversal enters ROM.  At that point FIND stops using the linked list
-; and tries to locate the word using the perfect hash table generated at
-; build time.  The _phash subroutine generates two hash values, H and L.
-; The target word, if it exists in ROM, will be available at one of two
-; hash locations: HL or LH.  HL is the more likely value and is searched
-; first.  BC maintains the state of the search location.  -1 indicates
-; that the search should use HL, 0 indicates that the search should use
-; LH, and 1 indicates that the search failed.
+; : FIND ( c-addr -- c-addr 0 | xt 1 | xt -1 )
+;   COUNT (FIND) ?DUP 0= IF DROP 1- 0 THEN ;
 
             LINKTO(FILL,0,4,'D',"NIF")
-FIND:       SAVEDE
-            SAVEBC
-            LXI     B,-1        ; Initialize our phash flag to -1.
-            LHLD    TICKLATEST  ; Get the latest dictionary pointer
-            XCHG                ; ..and put that into DE.
-            POP     H           ; Pop the counted string pointer
-            SHLD    HOLDH       ; ..and cache the value.
-_findAGAIN:
-#IFDEF PHASH
-            MOV     A,D         ; See if we are still in RAM (the
-            ANI     80h         ; ..high bit of the addr is not zero), and
-            JNZ     _findAGAIN1 ; ..keep traversing the linked list if so.
-_findPHASH: PUSH    H           ; Save the counted string pointer on the stack,
-            CALL    _phash      ; ..then hash the string.
-            MOV     A,C         ; Move our phash flag to A,
-            ORA     A           ; ..then check the state of the flag:
-            JM      _findPHASHH1; ..use H1 if the value is negative;
-            JZ      _findPHASHH2; ..use H2 if the value is zero;
-            POP     H           ; ..otherwise no match, pop the counted string
-            JMP     _findFAIL   ; ..and fail.
-_findPHASHH2:MOV    A,L         ; Move H2 to A,
-            MOV     L,H         ; ..move H1 to L,
-            JMP     _findPHASH1 ; ..then continue.
-_findPHASHH1:MOV    A,H         ; Move H1 to A
-_findPHASH1:ANI     PHASHMASK   ; ..and mask off the high bits of H1.
-            MOV     H,A         ; Get the masked off bits of H1 back into H.
-            DAD     H           ; HL=HL<<1 to convert from hash to cell offset.
-            MOV     A,H         ; Move the high byte of the offset to A,
-            ADI     PHASHTAB>>8 ; ..add the high byte of PHASHTAB to A,
-            MOV     H,A         ; ..and then put the PHASHTAB address into H.
-            MOV     E,M         ; Get the low byte of the hash cell in E,
-            INX     H           ; ..increment to the high byte,
-            MOV     D,M         ; ..then get the low byte into D.
-            POP     H           ; Restore the counted string pointer.
-            INX     B           ; Increment our phash flag.
-            MOV     A,D         ; Move D to A,
-            ORA     E           ; ..then OR A and E to see if the cell is zero;
-            JZ      _findPHASH  ; ..try to phash again if so.
-#ENDIF
-_findAGAIN1:LDAX    D           ; Get the name length into A.
-            ANI     01111111b   ; Strip the immediate bit.
-            CMP     M           ; Compare the two lengths+smudge bits.
-            JNZ     _findNEXTWORD;Jump if not zero (not equal) to the next word.
-            XCHG                ; Swap HL and DE,
-            SHLD    HOLDD       ; ..save DE (since we're about to change it),
-            XCHG                ; ..and then put DE and HL back again.
-            DCX     D           ; Go to the first dictionary char (prev byte).
-            INX     H           ; Go to the first string character.
-_findNEXTCHAR:LDAX  D           ; Get the next dictionary value into A.
-            ANI     01111111b   ; Strip the end-of-name bit.
-            CMP     M           ; Compare the two characters.
-            JZ      _findMATCHCHAR;Jump if zero (equal) to match.
-            XRI     00100000b   ; Try switching the case
-            CMP     M           ; ..and then repeating the match.
-            JNZ     _findNEXTWORDDE;..Not a match if not zero (not equal).
-            ORI     00100000b   ; Only a match if A-Z/a-z.  Force to lower,
-            CPI     'a'         ; ..then see if less than 'a'.
-            JM      _findNEXTWORDDE;..If so, this is not a match.
-            CPI     'z'+1       ; If greater than 'z'+1,
-            JP      _findNEXTWORDDE;..then this is also not a match.
-_findMATCHCHAR:LDAX D           ; The strings are a match if this is the last
-            ANI     10000000b   ; ..character in the name (high bit set).
-            JNZ     _findMATCH  ; We're done if this is a match.
-            DCX     D           ; Go to the next dictionary char (prev byte).
-            INX     H           ; Go to the next string character.
-            JMP     _findNEXTCHAR;Evaluate the next character.
-_findMATCH: LHLD    HOLDD       ; Restore DE (which is now pointing at a char)
-            XCHG                ; ..and then swap that value back into DE.
-            LDAX    D           ; Get the flags into A
-            ANI     10000000b   ; ..and focus on just the immediate flag.
-            INXNFATOCFA(D)      ; Skip ahead to the CFA (xt)
-            PUSH    D           ; ..and push xt to the stack.
-            JNZ     _findIMM    ; Immediate gets a 1 pushed to the stack,
-            LXI     H,0FFFFh    ; ..non-immediate gets a -1
-            PUSH    H           ; ..pushed to the stack.
-            JMP     _findDONE   ; We're done.
-_findIMM:   LXI     H,1         ; Immediate word, so push 1
-            PUSH    H           ; ..to the stack.
-            JMP     _findDONE   ; We're done.
-_findNEXTWORDDE:LHLD HOLDD      ; Restore DE (which is now pointing at a char)
-            XCHG                ; ..and then swap that value back into DE.
-_findNEXTWORD:INXNFATOLFA(D)    ; Move to the word's LFA,
-            LHLX                ; ..get the LFA in HL,
-            XCHG                ; ..put the LFA into DE,
-            LHLD    HOLDH       ; ..and restore HL.
-            MOV     A,D         ; Keep searching for a match
-            ORA     E           ; ..if the LFA
-            JNZ     _findAGAIN  ; ..is not zero.
-_findFAIL:  PUSH    H           ; Otherwise push c-addr
-            LXI     H,0         ; ..and false
-            PUSH    H           ; ..to the stack.
-_findDONE:  RESTOREDE
-            RESTOREBC
-            NEXT
-
-#IFDEF PHASH
-; Entry: HL=c-addr (all registers are used)
-; Exit : HL=hash values (H1 in H, H2 in L)
-_phash:     PUSH    B           ; Save BC
-            PUSH    D           ; ..and DE.
-            LXI     D,0         ; Clear the hash values,
-            PUSH    D           ; ..which are stored on the stack.
-            MOV     A,M         ; Get the length of the string in A,
-            ORA     A           ; ..see if the string is zero-length;
-            JZ      _phashDONE  ; ..and exit if so.
-            MOV     C,A         ; Otherwise move the length to A.
-            INX     H           ; Increment to the first character.
-_phashNEXT: MOV     A,M         ; Get the next character into A,
-            CPI     'a'         ; ..then see if less than 'a';
-            JM      _phashNEXT1 ; ..if so, don't uppercase.
-            CPI     'z'+1       ; If greater than 'z'+1,
-            JP      _phashNEXT1 ; ..don't uppercase.
-            ANI     11011111b   ; Convert uppercase to lowercase.
-_phashNEXT1:XTHL                ; Swap the string pos with the hashes.
-            MOV     B,A         ; Save a copy of the character.
-            XRA     H           ; XOR the character with the H1,
-            MOV     E,A         ; ..move the PHASHAUX offset into E,
-            MVI     D,PHASHAUX1>>8;.put the PHASHAUX1 base offset into D,
-            LDAX    D           ; ..then lookup the new hash value,
-            MOV     H,A         ; ..and move the hash value to H.
-            MOV     A,B         ; Get the cached copy of the character.
-            XRA     L           ; XOR the character with the H2,
-            MOV     E,A         ; ..move the PHASHAUX offset into E,
-            MVI     D,PHASHAUX2>>8;.put the PHASHAUX2 base offset into D,
-            LDAX    D           ; ..then lookup the new hash value,
-            MOV     L,A         ; ..and move the hash value to L.
-            XTHL                ; Swap the hashes with the string pos.
-            INX     H           ; Increment to the next character,
-            DCR     C           ; ..decrement the count,
-            JNZ     _phashNEXT  ; ..and keep looping if we count is not zero.
-_phashDONE: POP     H           ; Pop the hash values into HL.
-            POP     D           ; Restore DE
-            POP     B           ; ..and BC.
-            RET                 ; We're done.
-#ENDIF
+FIND:       JMP     ENTER
+            .WORD   COUNT,PFIND,QDUP,ZEROEQUALS,zbranch,_find1
+            .WORD   DROP,ONEMINUS,ZERO
+_find1:     .WORD   EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -2001,14 +1863,14 @@ OVER:       PUSH    D           ; Save DE on the stack.
 ; definition.
 ;
 ; : POSTPONE ( "<spaces>name" --)
-;   BL WORD FIND  DUP 0= IF DUP COUNT TYPE SPACE [CHAR] ? EMIT CR ABORT THEN
+;   PARSE-WORD (FIND)  DUP 0= IF DROP TYPE SPACE [CHAR] ? EMIT CR ABORT THEN
 ;   0< IF  ['] LIT COMPILE,  ,  ['] COMPILE, COMPILE, ELSE COMPILE, THEN
 ; ; IMMEDIATE
 
             LINKTO(OVER,1,8,'E',"NOPTSOP")
 POSTPONE:   JMP     ENTER
-            .WORD   BL,WORD,FIND,DUP,ZEROEQUALS,zbranch,_postpone1
-            .WORD   DROP,COUNT,TYPE,SPACE,LIT,'?',EMIT,CR,ABORT
+            .WORD   PARSEWORD,PFIND,DUP,ZEROEQUALS,zbranch,_postpone1
+            .WORD   DROP,TYPE,SPACE,LIT,'?',EMIT,CR,ABORT
 _postpone1: .WORD   ZEROLESS,zbranch,_postpone2
             .WORD   LIT,LIT,COMPILECOMMA,COMMA,LIT,COMPILECOMMA,COMPILECOMMA
             .WORD       branch,_postpone3
@@ -3081,6 +2943,166 @@ ENDLOOP:    JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
+; (FIND) [MFORTH] "paren-find-paren" ( c-addr u -- c-addr u 0 | xt 1 | xt -1 )
+;
+; Find the definition named in the string at c-addr with length u.  If the
+; definition is not found, return the string and zero.  If the definition is
+; found, return its execution token xt.  If the definition is immediate,
+; also return one (1), otherwise also return minus-one (-1).  For a given
+; string, the values returned by FIND while compiling may differ from
+; those returned while not compiling.
+;
+; ---
+; This word traverses the dictionary's linked list until the traversal
+; enters ROM.  At that point (FIND) stops using the linked list and tries
+; to locate the word using the perfect hash table generated at build time.
+; The _phash subroutine generates two hash values, H and L.  The target
+; word, if it exists in ROM, will be found at one of two locations: HL or
+; LH.  HL is the more likely value and is searched first.  BC maintains the
+; state of the search location.  -1 indicates that the search should use
+; HL, 0 indicates that the search should use LH, and 1 indicates that the
+; search failed.
+
+            LINKTO(DIGITQ,0,6,029h,"DNIF(")
+PFIND:      SAVEDE
+            SAVEBC
+            LXI     B,-1        ; Initialize our phash flag to -1.
+            LHLD    TICKLATEST  ; Get the latest dictionary pointer
+            XCHG                ; ..and put that into DE.
+            POP     H           ; Pop the length of the string
+            SHLD    HOLDD       ; ..and cache the value.
+            POP     H           ; Pop the string pointer
+            SHLD    HOLDH       ; ..and cache the value.
+_pfindAGAIN:
+#IFDEF PHASH
+            MOV     A,D         ; See if we are still in RAM (the
+            ANI     80h         ; ..high bit of the addr is not zero), and
+            JNZ     _pfindAGAIN1; ..keep traversing the linked list if so.
+_pfindPHASH:PUSH    H           ; Save the string pointer on the stack,
+            LDA     HOLDD       ; ..get the string length into A,
+            CALL    _phash      ; ..then hash the string.
+            MOV     A,C         ; Move our phash flag to A,
+            ORA     A           ; ..then check the state of the flag:
+            JM      _pfindPHASHH1;..use H1 if the value is negative;
+            JZ      _pfindPHASHH2;..use H2 if the value is zero;
+            POP     H           ; ..otherwise no match, pop the counted string
+            JMP     _pfindFAIL  ; ..and fail.
+_pfindPHASHH2:MOV    A,L        ; Move H2 to A,
+            MOV     L,H         ; ..move H1 to L,
+            JMP     _pfindPHASH1; ..then continue.
+_pfindPHASHH1:MOV    A,H        ; Move H1 to A
+_pfindPHASH1:ANI    PHASHMASK   ; ..and mask off the high bits of H1.
+            MOV     H,A         ; Get the masked off bits of H1 back into H.
+            DAD     H           ; HL=HL<<1 to convert from hash to cell offset.
+            MOV     A,H         ; Move the high byte of the offset to A,
+            ADI     PHASHTAB>>8 ; ..add the high byte of PHASHTAB to A,
+            MOV     H,A         ; ..and then put the PHASHTAB address into H.
+            MOV     E,M         ; Get the low byte of the hash cell in E,
+            INX     H           ; ..increment to the high byte,
+            MOV     D,M         ; ..then get the low byte into D.
+            POP     H           ; Restore the string pointer.
+            INX     B           ; Increment our phash flag.
+            MOV     A,D         ; Move D to A,
+            ORA     E           ; ..then OR A and E to see if the cell is zero;
+            JZ      _pfindPHASH ; ..try to phash again if so.
+#ENDIF
+_pfindAGAIN1:LDAX    D          ; Get the name length into A.
+            ANI     01111111b   ; Strip the immediate bit.
+            LXI     H,HOLDD     ; Point HL at the string length,
+            CMP     M           ; ..then compare the two lengths+smudge bits.
+            JNZ     _pfindNEXTWORD;Jump if not zero (not equal) to the next word.
+            PUSH    D           ; Save DE since we are about to scan through it.
+            DCX     D           ; Go to the first dictionary char (prev byte).
+            LHLD    HOLDH       ; Point HL at the first string character.
+_pfindNEXTCHAR:LDAX  D          ; Get the next dictionary value into A.
+            ANI     01111111b   ; Strip the end-of-name bit.
+            CMP     M           ; Compare the two characters.
+            JZ      _pfindMATCHCHAR;Jump if zero (equal) to match.
+            XRI     00100000b   ; Try switching the case
+            CMP     M           ; ..and then repeating the match.
+            JNZ     _pfindNEXTWORDDE;..Not a match if not zero (not equal).
+            ORI     00100000b   ; Only a match if A-Z/a-z.  Force to lower,
+            CPI     'a'         ; ..then see if less than 'a'.
+            JM      _pfindNEXTWORDDE;..If so, this is not a match.
+            CPI     'z'+1       ; If greater than 'z'+1,
+            JP      _pfindNEXTWORDDE;..then this is also not a match.
+_pfindMATCHCHAR:LDAX D          ; The strings are a match if this is the last
+            ANI     10000000b   ; ..character in the name (high bit set).
+            JNZ     _pfindMATCH ; We're done if this is a match.
+            DCX     D           ; Go to the next dictionary char (prev byte).
+            INX     H           ; Go to the next string character.
+            JMP     _pfindNEXTCHAR;Evaluate the next character.
+_pfindMATCH: POP     D          ; Restore DE (which is now pointing at a char)
+            LDAX    D           ; Get the flags into A
+            ANI     10000000b   ; ..and focus on just the immediate flag.
+            INXNFATOCFA(D)      ; Skip ahead to the CFA (xt)
+            PUSH    D           ; ..and push xt to the stack.
+            JNZ     _pfindIMM   ; Immediate gets a 1 pushed to the stack,
+            LXI     H,0FFFFh    ; ..non-immediate gets a -1
+            PUSH    H           ; ..pushed to the stack.
+            JMP     _pfindDONE  ; We're done.
+_pfindIMM:   LXI     H,1        ; Immediate word, so push 1
+            PUSH    H           ; ..to the stack.
+            JMP     _pfindDONE  ; We're done.
+_pfindNEXTWORDDE:POP D          ; Restore DE (which is now pointing at a char).
+_pfindNEXTWORD:INXNFATOLFA(D)   ; Move to the word's LFA,
+            LHLX                ; ..get the LFA in HL,
+            XCHG                ; ..put the LFA into DE,
+            LHLD    HOLDH       ; ..and restore HL.
+            MOV     A,D         ; Keep searching for a match
+            ORA     E           ; ..if the LFA
+            JNZ     _pfindAGAIN ; ..is not zero.
+_pfindFAIL: LHLD    HOLDH       ; Otherwise push restore c-addr,
+            PUSH    H           ; ..push it to the stack,
+            LHLD    HOLDD       ; ..restore u,
+            PUSH    H           ; ..push it to the stack,
+            LXI     H,0         ; ..and then push false
+            PUSH    H           ; ..to the stack.
+_pfindDONE: RESTOREDE
+            RESTOREBC
+            NEXT
+
+#IFDEF PHASH
+; Entry: HL=c-addr A=u (all registers are used)
+; Exit : HL=hash values (H1 in H, H2 in L)
+_phash:     PUSH    B           ; Save BC
+            PUSH    D           ; ..and DE.
+            LXI     D,0         ; Clear the hash values,
+            PUSH    D           ; ..which are stored on the stack.
+            ORA     A           ; See if the string is zero-length;
+            JZ      _phashDONE  ; ..and exit if so.
+            MOV     C,A         ; Otherwise move the length to A.
+_phashNEXT: MOV     A,M         ; Get the next character into A,
+            CPI     'a'         ; ..then see if less than 'a';
+            JM      _phashNEXT1 ; ..if so, don't uppercase.
+            CPI     'z'+1       ; If greater than 'z'+1,
+            JP      _phashNEXT1 ; ..don't uppercase.
+            ANI     11011111b   ; Convert uppercase to lowercase.
+_phashNEXT1:XTHL                ; Swap the string pos with the hashes.
+            MOV     B,A         ; Save a copy of the character.
+            XRA     H           ; XOR the character with the H1,
+            MOV     E,A         ; ..move the PHASHAUX offset into E,
+            MVI     D,PHASHAUX1>>8;.put the PHASHAUX1 base offset into D,
+            LDAX    D           ; ..then lookup the new hash value,
+            MOV     H,A         ; ..and move the hash value to H.
+            MOV     A,B         ; Get the cached copy of the character.
+            XRA     L           ; XOR the character with the H2,
+            MOV     E,A         ; ..move the PHASHAUX offset into E,
+            MVI     D,PHASHAUX2>>8;.put the PHASHAUX2 base offset into D,
+            LDAX    D           ; ..then lookup the new hash value,
+            MOV     L,A         ; ..and move the hash value to L.
+            XTHL                ; Swap the hashes with the string pos.
+            INX     H           ; Increment to the next character,
+            DCR     C           ; ..decrement the count,
+            JNZ     _phashNEXT  ; ..and keep looping if we count is not zero.
+_phashDONE: POP     H           ; Pop the hash values into HL.
+            POP     D           ; Restore DE
+            POP     B           ; ..and BC.
+            RET                 ; We're done.
+#ENDIF
+
+
+; ----------------------------------------------------------------------
 ; HERE>CHAIN [MFORTH] "here-to-chain" ( addr -- )
 ;
 ; Store HERE in the zero-terminated chain beginning at addr.  Each addr
@@ -3091,7 +3113,7 @@ ENDLOOP:    JMP     ENTER
 ; HERE>CHAIN ( addr -- )
 ;   BEGIN ?DUP WHILE DUP @ HERE ( a a' h) ROT ! REPEAT ;
 
-            LINKTO(DIGITQ,0,10,'N',"IAHC>EREH")
+            LINKTO(PFIND,0,10,'N',"IAHC>EREH")
 HERETOCHAIN:JMP     ENTER
 _htc1:      .WORD   QDUP,zbranch,_htc2
             .WORD   DUP,FETCH,HERE,ROT,STORE,branch,_htc1
@@ -3169,13 +3191,13 @@ INITICBS:   JMP     ENTER
 ; : INTERPRET ( i*x -- j*x )
 ;   0 >IN !
 ;   BEGIN
-;   BL WORD DUP C@ WHILE        -- textadr
-;       FIND                    -- a 0/1/-1
+;   PARSE-WORD DUP WHILE        -- textadr
+;       (FIND)                  -- ca u 0/1/-1
 ;       ?DUP IF                 -- xt 1/-1
 ;           1+ STATE @ 0= OR    immed or interp?
 ;           IF EXECUTE ELSE COMPILE, THEN
 ;       ELSE                    -- textadr
-;           COUNT NUMBER?
+;           NUMBER?
 ;           IF                  -- converted ok
 ;               STATE @ IF POSTPONE LITERAL THEN
 ;                               -- else leave on stack (not compiling)
@@ -3183,22 +3205,22 @@ INITICBS:   JMP     ENTER
 ;               TYPE SPACE [CHAR] ? EMIT CR ABORT  err
 ;           THEN
 ;       THEN
-;   REPEAT DROP ;
+;   REPEAT 2DROP ;
 
             LINKTO(INITICBS,0,9,'T',"ERPRETNI")
 INTERPRET:  JMP     ENTER
             .WORD   ZERO,TOIN,STORE
-_interpret1:.WORD   BL,WORD,DUP,CFETCH,zbranch,_interpret6
-            .WORD   FIND,QDUP,zbranch,_interpret3
+_interpret1:.WORD   PARSEWORD,DUP,zbranch,_interpret6
+            .WORD   PFIND,QDUP,zbranch,_interpret3
             .WORD   ONEPLUS,STATE,FETCH,ZEROEQUALS,OR,zbranch,_interpret2
             .WORD   EXECUTE,branch,_interpret5
 _interpret2:.WORD   COMPILECOMMA,branch,_interpret5
-_interpret3:.WORD   COUNT,NUMBERQ,zbranch,_interpret4
+_interpret3:.WORD   NUMBERQ,zbranch,_interpret4
             .WORD   STATE,FETCH,zbranch,_interpret5
             .WORD   LITERAL,branch,_interpret5
 _interpret4:.WORD   TYPE,SPACE,LIT,'?',EMIT,CR,ABORT
 _interpret5:.WORD   branch,_interpret1
-_interpret6:.WORD   DROP
+_interpret6:.WORD   TWODROP
             .WORD   EXIT
 
 
