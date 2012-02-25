@@ -37,7 +37,6 @@
 ; characters and is u1 minus n characters long.
 
             LINKTO(LINK_STRING,0,7,'G',"NIRTS/")
-LAST_STRING:
 SLASHSTRING:SAVEDE
             MOV     D,B         ; Save BC
             MOV     E,C         ; ..in DE.
@@ -50,5 +49,64 @@ SLASHSTRING:SAVEDE
             PUSH    H           ; Push the length onto the stack.
             MOV     B,D         ; Restore BC
             MOV     C,E         ; ..from DE.
+            RESTOREDE
+            NEXT
+
+
+; ----------------------------------------------------------------------
+; CMOVE [STRING] 17.6.1.0910 "c-move" ( c-addr1 c-addr2 u -- )
+;
+; If u is greater than zero, copy u consecutive characters from the data
+; space starting at c-addr1 to that starting at c-addr2, proceeding
+; character-by-character from lower addresses to higher addresses.
+
+            LINKTO(SLASHSTRING,0,5,'E',"VOMC")
+CMOVE:      SAVEDE
+            SAVEBC
+            POP     B           ; Pop u into BC.
+            POP     D           ; Pop addr2 into DE.
+            POP     H           ; Pop addr1 into HL.
+_cmove1:    MOV     A,B         ; We're done if B
+            ORA     C           ; ..and C
+            JZ      _cmoveDONE  ; ..are zero.
+            MOV     A,M         ; Copy the next byte from [HL]
+            STAX    D           ; ..to [DE]
+            INX     H           ; ..and then increment both HL
+            INX     D           ; ..and DE.
+            DCX     B           ; Decrement BC
+            JMP     _cmove1     ; ..and continue looping.
+_cmoveDONE: RESTOREBC
+            RESTOREDE
+            NEXT
+
+
+; ----------------------------------------------------------------------
+; CMOVE> [STRING] 17.6.1.0920 "c-move-up" ( c-addr1 c-addr2 u -- )
+;
+; If u is greater than zero, copy u consecutive characters from the data
+; space starting at c-addr1 to that starting at c-addr2, proceeding
+; character-by-character from higher addresses to lower addresses.
+
+            LINKTO(CMOVE,0,6,'>',"EVOMC")
+LAST_STRING:
+CMOVEUP:    SAVEDE
+            SAVEBC
+            POP     B           ; Pop u into BC.
+            POP     D           ; Pop addr2 into DE.
+            POP     H           ; Pop addr1 into HL.
+            DAD     B           ; Add u to addr1.
+            XCHG                ; Swap addr1 and addr2,
+            DAD     B           ; ..add u to addr2,
+            XCHG                ; ..then swap addr2 and addr1 again.
+_cmoveup1:  MOV     A,B         ; We're done if B
+            ORA     C           ; ..and C
+            JZ      _cmoveupDONE; ..are zero.
+            DCX     H           ; Decrement both HL
+            DCX     D           ; ..and DE.
+            MOV     A,M         ; Copy the next byte from [HL]
+            STAX    D           ; ..to [DE].
+            DCX     B           ; Decrement BC
+            JMP     _cmoveup1   ; ..and continue looping.
+_cmoveupDONE:RESTOREBC
             RESTOREDE
             NEXT

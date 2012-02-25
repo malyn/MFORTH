@@ -165,11 +165,22 @@ COMPILECOMMA:JMP    ENTER
 
 
 ; ----------------------------------------------------------------------
+; FALSE [CORE EXT] 6.2.1485 ( -- false )
+;
+; Return a false flag.
+
+            LINKTO(COMPILECOMMA,0,5,'E',"SLAF")
+FALSE:      LXI     H,0
+            PUSH    H
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; HEX [CORE EXT] 6.2.1660 ( -- )
 ;
 ; Set contents of BASE to sixteen.
 
-            LINKTO(COMPILECOMMA,0,3,'X',"EH")
+            LINKTO(FALSE,0,3,'X',"EH")
 HEX:        JMP     ENTER
             .WORD   LIT,16,BASE,STORE,EXIT
 
@@ -267,11 +278,22 @@ TIB:        LHLD    TICKTIB
 
 
 ; ----------------------------------------------------------------------
+; TRUE [CORE EXT] 6.2.1485 ( -- true )
+;
+; Return a true flag.
+
+            LINKTO(TIB,0,4,'E',"URT")
+TRUE:       LXI     H,0FFFFh
+            PUSH    H
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; TUCK [CORE EXT] 6.2.2300 ( x1 x2 -- x2 x1 x2 )
 ;
 ; Copy the first (top) stack item below the second stack item.
 
-            LINKTO(TIB,0,4,'K',"CUT")
+            LINKTO(TRUE,0,4,'K',"CUT")
 TUCK:       SAVEDE
             POP     D           ; Pop x2 into DE.
             POP     H           ; Pop x1 into HL.
@@ -280,6 +302,41 @@ TUCK:       SAVEDE
             PUSH    D           ; Push x2 onto the stack again.
             RESTOREDE
             NEXT
+
+
+; ----------------------------------------------------------------------
+; WITHIN [CORE EXT] 6.2.2440 ( n1|u1 n2|u2 n3|u3 -- flag )
+;
+; Perform a comparison of a test value n1|u1 with a lower limit n2|u2 and
+; an upper limit n3|u3, returning true if either (n2|u2 < n3|u3 and
+; (n2|u2 <= n1|u1 and n1|u1 < n3|u3)) or (n2|u2 > n3|u3 and (n2|u2 <= n1|u1
+; or n1|u1 < n3|u3)) is true, returning false otherwise.  An ambiguous
+; condition exists if n1|u1, n2|u2, and n3|u3 are not all the same type.
+;
+; ---
+; ; WITHIN ( n1|u1 n2|u2 n3|u3 -- flag)   OVER - >R - R>  U< ;
+
+            LINKTO(TUCK,0,6,'N',"IHTIW")
+WITHIN:     JMP     ENTER
+            .WORD   OVER,MINUS,TOR,MINUS,RFROM,ULESSTHAN,EXIT
+
+
+; ----------------------------------------------------------------------
+; \ [CORE EXT] 6.2.2535 "backslash"
+;
+; Compilation:
+;   Perform the execution semantics given below.
+;
+; Execution: ( "ccc<eol>"-- )
+;   Parse and discard the remainder of the parse area.  \ is an immediate
+;   word.
+;
+; ---
+; : \   SOURCE NIP >IN ! ; IMMEDIATE
+
+            LINKTO(WITHIN,1,1,05Ch,"")
+BACKSLASH:  JMP     ENTER
+            .WORD   SOURCE,NIP,TOIN,STORE,EXIT
 
 
 
@@ -292,7 +349,7 @@ TUCK:       SAVEDE
 ;
 ; Runtime behavior of C": return c-addr.
 
-            LINKTO(TUCK,0,4,029h,"\"c(")
+            LINKTO(BACKSLASH,0,4,029h,"\"c(")
 LAST_COREEXT:
 PCQUOTE:    PUSH    D           ; Push string address onto the stack.
             LHLX                ; Read string count from instruction stream.

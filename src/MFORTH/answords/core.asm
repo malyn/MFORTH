@@ -119,8 +119,21 @@ _tick1:     .WORD   EXIT
 ;   Parse ccc delimited by ) (right parenthesis).  ( is an immediate word.
 ;   The number of characters in ccc may be zero to the number of characters
 ;   in the parse area.
-
-; TODO: Really should use PARSE here instead of WORD COUNT.
+;
+; Extended by FILE:
+;   When parsing from a text file, if the end of the parse area is reached
+;   before a right parenthesis is found, refill the input buffer from the
+;   next line of the file, set >IN to zero, and resume parsing, repeating
+;   this process until either a right parenthesis is found or the end of the
+;   file is reached.
+;
+; ---
+; TODO: Need to implement the extended FILE logic.  I recommend that we modify
+;       this code to use REFILL.  We should also avoid WORD altogether and
+;       just go through the input source on our own.  Note that we need to
+;       rewrite this in assembly language so that we don't get hit by the
+;       perf issues of processing one byte at a time in high-level code.
+;
 ; : ( ( "ccc<quote>" --)   CHAR] ) PARSE  2DROP ;
 
             LINKTO(TICK,1,1,028h,"")
@@ -442,6 +455,8 @@ TWOSTAR:    POP     H           ; Pop x1.
 TWOSLASH:   POP     H           ; Pop x1.
             ANA     A           ; Clear the carry flag.
             MOV     A,H         ; Move the high byte into A,
+            RLC                 ; ..rotate it left
+            RRC                 ; ..and then right through carry, then
             RAR                 ; ..divide the high byte,
             MOV     H,A         ; ..and put the high byte back into H.
             MOV     A,L         ; Move the low byte into A,
@@ -663,23 +678,13 @@ _eqDONE:    PUSH    H           ; Push the flag to the stack.
 ; > [CORE] 6.1.0540 "greater-than" ( n1 n2 -- flag )
 ;
 ; flag is true if and only if n1 is greater than n2.
+;
+; ---
+; : > ( n1 n2 -- flag)   SWAP < ;
 
             LINKTO(EQUALS,0,1,'>',"")
-GREATERTHAN:SAVEDE
-            POP     H           ; Pop n2.
-            POP     D           ; Pop n1.
-            PUSH    B           ; Save BC.
-            MOV     B,D         ; Move n1
-            MOV     C,E         ; ..to BC.
-            DSUB                ; HL=n2-n1
-            POP     B           ; Restore BC.
-            JP      _gtFALSE    ; Jump if positive to where we push false.
-            LXI     H,0FFFFh    ; Put true in HL.
-            JMP     _gtDONE     ; We're done.
-_gtFALSE:   LXI     H,0         ; Put false in HL.
-_gtDONE:    PUSH    H           ; Push the flag to the stack.
-            RESTOREDE
-            NEXT
+GREATERTHAN:JMP     ENTER
+            .WORD   SWAP,LESSTHAN,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -722,18 +727,19 @@ TOIN:       JMP     ENTER
 ; converted.  u2 is the number of unconverted characters in the string.  An
 ; ambiguous condition exists if ud2 overflows during the conversion.
 ;
-; : >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 )
-;   2>B  FORB  B@ DIGIT? 0=  ?ENDB
+;   2>B  BEGIN B? WHILE
+;       B@ DIGIT? 0= IF B B# EXIT THEN
 ;       ( ud1 u) >R BASE @ UD* R> M+
-;   NEXTB  B 1+ B# ;
+;   B+ AGAIN  B B# ;
 
             LINKTO(TOIN,0,7,'R',"EBMUN>")
 TONUMBER:   JMP     ENTER
             .WORD   TWOTOB
-_tonumber1: .WORD   BQUES,zbranch,_tonumber2
-            .WORD   BFETCH,DIGITQ,ZEROEQUALS,INVERT,zbranch,_tonumber2
-            .WORD   TOR,BASE,FETCH,UDSTAR,RFROM,MPLUS,BPLUS,branch,_tonumber1
-_tonumber2: .WORD   B,ONEPLUS,BNUMBER
+_tonumber1: .WORD   BQUES,zbranch,_tonumber3
+            .WORD   BFETCH,DIGITQ,ZEROEQUALS,zbranch,_tonumber2
+            .WORD   B,BNUMBER,EXIT
+_tonumber2: .WORD   TOR,BASE,FETCH,UDSTAR,RFROM,MPLUS,BPLUS,branch,_tonumber1
+_tonumber3: .WORD   B,BNUMBER
             .WORD   EXIT
 
 
@@ -1038,6 +1044,7 @@ CELLPLUS:   POP     H           ; Pop a-addr1.
             INX     H           ; Add two (the size of a cell)
             INX     H           ; ..to a-addr1.
             PUSH    H           ; Push the result to the stack.
+            NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -1074,6 +1081,7 @@ CHAR:       JMP     ENTER
 CHARPLUS:   POP     H           ; Pop c-addr1.
             INX     H           ; Add one (the size of a char) to c-addr1.
             PUSH    H           ; Push the result to the stack.
+            NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -1588,23 +1596,29 @@ _phashDONE: POP     H           ; Pop the hash values into HL.
 ; single-cell signed integer. 
 ;
 ; ---
-; Floored division is like symmetric division, except that negative
-; quotients cause the remainder to be increased by the divisor (which
-; we stash away on the return stack) and the quotient to move towards
-; negative infinity (the "floored" part of floored arithmetic).
+; Floored division is integer division in which the remainder carries the
+; sign of the divisor or is zero, and the quotient is rounded to its
+; arithmetic floor.
 ;
 ; : FM/MOD ( d1 n1 -- n2 n3)
-;   DUP >R SM/REM ( rem quo  R:n1)
-;   DUP 0< IF 1- SWAP R> + SWAP ( rem+n1 quo-1)
-;   ELSE R> DROP THEN ;
-
+;   DUP >R ( num den R:signrem) 2DUP XOR ( num den signquo R:signrem)
+;   SWAP ABS DUP >R ( num signquo +den R:signrem +den)
+;   SWAP >R >R DABS R> ( num +den R:signrem +den signquo) SM/REM ( rem quo R:..)
+;   R> 0< IF NEGATE OVER 0<> IF 1- SWAP R> SWAP - SWAP ELSE R> DROP THEN
+;       ELSE R> DROP THEN
+;   R> 0< IF SWAP NEGATE SWAP THEN ;
 
             LINKTO(FIND,0,6,'D',"OM/MF")
 FMSLASHMOD: JMP     ENTER
-            .WORD   DUP,TOR,SMSLASHREM,DUP,ZEROLESS,zbranch,_fmslashmod1
-            .WORD   ONEMINUS,SWAP,RFROM,PLUS,SWAP,branch,_fmslashmod2
+            .WORD   DUP,TOR,TWODUP,XOR,SWAP,ABS,DUP,TOR
+            .WORD   SWAP,TOR,TOR,DABS,RFROM,UMSLASHMOD
+            .WORD   RFROM,ZEROLESS,zbranch,_fmslashmod1
+            .WORD   NEGATE,OVER,ZERONOTEQUALS,zbranch,_fmslashmod1
+            .WORD   ONEMINUS,SWAP,RFROM,SWAP,MINUS,SWAP,branch,_fmslashmod2
 _fmslashmod1:.WORD  RFROM,DROP
-_fmslashmod2:.WORD  EXIT
+_fmslashmod2:.WORD  RFROM,ZEROLESS,zbranch,_fmslashmod3
+            .WORD   SWAP,NEGATE,SWAP
+_fmslashmod3:.WORD  EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -1904,26 +1918,15 @@ MOD:        JMP     ENTER
 ; completes, the u consecutive address units at addr2 contain exactly what
 ; the u consecutive address units at addr1 contained before the move.
 ;
-; : MOVE ( addr1 addr2 u --)   2>B FORB DUP C@ B! 1+ NEXTB DROP ;
+; : MOVE ( addr1 addr2 u --)
+;   >R 2DUP SWAP DUP R@ + WITHIN R> SWAP IF CMOVE> ELSE CMOVE THEN ;
 
             LINKTO(MOD,0,4,'E',"VOM")
-MOVE:       SAVEDE
-            SAVEBC
-            POP     B           ; Pop u into BC.
-            POP     D           ; Pop addr2 into DE.
-            POP     H           ; Pop addr1 into HL.
-_move1:     MOV     A,B         ; We're done if B
-            ORA     C           ; ..and C
-            JZ      _moveDONE   ; ..are zero.
-            MOV     A,M         ; Copy the next byte from [HL]
-            STAX    D           ; ..to [DE]
-            INX     H           ; ..and then increment both HL
-            INX     D           ; ..and DE.
-            DCX     B           ; Decrement BC
-            JMP     _move1      ; ..and continue looping.
-_moveDONE:  RESTOREBC
-            RESTOREDE
-            NEXT
+MOVE:       JMP     ENTER
+            .WORD   TOR,TWODUP,SWAP,DUP,RFETCH,PLUS,WITHIN
+            .WORD   RFROM,SWAP,zbranch,_move1
+            .WORD   CMOVEUP,EXIT
+_move1:     .WORD   CMOVE,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -2166,6 +2169,13 @@ _rshiftDONE:PUSH    H           ; Push the result (HL).
 ; Interpretation:
 ;   Interpretation semantics for this word are undefined.
 ;
+;   Extended by FILE:
+;       Parse ccc delimited by " (double quote).  Store the resulting
+;       string c-addr u at a temporary location.  The maximum length of
+;       the temporary buffer is implementation-dependent but shall be no
+;       less than 80 characters.  Subsequent uses of S" may overwrite the
+;       temporary buffer.  At least one such buffer shall be provided.
+;
 ; Compilation: ( "ccc<quote>" -- )
 ;   Parse ccc delimited by " (double-quote).  Append the run-time
 ;   semantics given below to the current definition.
@@ -2264,7 +2274,7 @@ SPACE:      MVI     A,020h      ; Put the space character in A.
 ;
 ; : SPACES ( n -- )   DUP IF SPACE 1- THEN DROP ;
 
-            LINKTO(SPACE,0,5,'S',"ECAPS")
+            LINKTO(SPACE,0,6,'S',"ECAPS")
 SPACES:     JMP     ENTER
 _spaces1:   .WORD   DUP,zbranch,_spacesDONE,SPACE,ONEMINUS,branch,_spaces1
 _spacesDONE:.WORD   DROP
@@ -2591,11 +2601,11 @@ UNTIL:      JMP     ENTER
 ;   for initializing the contents of the reserved cell.
 
 ; : VARIABLE ( "<spaces>name" -- )
-;   CREATE  NFATOCFASZ NEGATE ALLOT  195 C, DOVARIABLE ,  0 , ; -- JMP DOVARIABLE
+;   CREATE  CFASZ NEGATE ALLOT  195 C, DOVARIABLE ,  0 , ; -- JMP DOVARIABLE
 
             LINKTO(UNTIL,0,8,'E',"LBAIRAV")
 VARIABLE:   JMP     ENTER
-            .WORD   CREATE,LIT,-NFATOCFASZ,ALLOT,LIT,195,CCOMMA,LIT,DOVARIABLE,COMMA
+            .WORD   CREATE,LIT,-CFASZ,ALLOT,LIT,195,CCOMMA,LIT,DOVARIABLE,COMMA
             .WORD   ZERO,COMMA,EXIT
 
 
@@ -2672,8 +2682,13 @@ pword:      SAVEDE
             
 _pwordSKIP: MOV     A,M         ; Get the next char at srcpos
             CMP     B           ; ..and see if it is the same as the delim;
-            JNZ     _pwordPRECOPY;..start copying if so.
-            INX     H           ; Advance to the next src location,
+            JZ      _pwordSKIP1 ; ..keep skipping if so.
+            ANI     11100000b   ; Not a match; but is A a control char?
+            JNZ     _pwordPRECOPY;..if not, just start copying,
+            MOV     A,B         ; ..otherwise see if delim
+            CPI     020h        ; ..is space;
+            JNZ     _pwordPRECOPY;..and copy if so, otherwise keep skipping.
+_pwordSKIP1:INX     H           ; Advance to the next src location,
             DCR     C           ; ..decrement srclen,
             JNZ     _pwordSKIP  ; ..and keep copying if there are more chars.
 
@@ -2683,9 +2698,14 @@ _pwordNOBYTES:PUSH  H           ; No bytes to copy, so push srcpos as copystart
 _pwordPRECOPY:PUSH  H           ; Push srcpos as copystart to the stack.
 _pwordCOPY: MOV     A,M         ; Get the next char at srcpos
             CMP     B           ; ..and see if it is the same as delim;
-            JZ      _pwordDONE  ; ..we're done copying is so.
-            STAX    D           ; Copy the character to wordpos,
-            INX     D           ; ..advance wordpos,
+            JZ      _pwordDONE  ; ..stop copying if so.
+            STAX    D           ; Copy char to wordpos before we corrupt A.
+            ANI     11100000b   ; Not a match; but is A a control char?
+            JNZ     _pwordCOPY1 ; ..if not, just keep copying,
+            MOV     A,B         ; ..otherwise see if delim
+            CPI     020h        ; ..is space;
+            JZ      _pwordDONE  ; ..and stop if so, otherwise keep copying.
+_pwordCOPY1:INX     D           ; Advance wordpos,
             INX     H           ; ..advance srcpos,
             DCR     C           ; ..decrement srclen,
             JNZ     _pwordCOPY  ; ..and keep copying if there are more chars.

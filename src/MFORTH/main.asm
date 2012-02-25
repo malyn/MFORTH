@@ -419,7 +419,9 @@ INT65:      CALL    INTCALL
 INT75:      CALL    INTCALL
             .WORD   0003Ch
             PUSH    H
+            PUSH    PSW
             CALL    INCTICKS
+            POP     PSW
             POP     H
             RET
 INCTICKS:   LXI     H,TICKTICKS
