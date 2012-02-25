@@ -170,32 +170,24 @@ _filesize1: .WORD   DUP,LIT,FCBEND,PLUS,FETCH,SWAP,LIT,FCBADDR,PLUS,FETCH
 ;
 ; ---
 ; \ TODO: Store zero in BLK.
-; \ TODO? Use SOURCE-ID (FILEID>FCB) instead of storing FCB on the return
-; \       stack (INCLUDE nesting could use up a lot of the return stack).
-; \ TODO? Have NEXT-LINE return addresses instead of lengths so that we
-; \       don't have to do addition here.
 ; : INCLUDE-FILE  ( i*x fileid -- j*x)
-;   DUP FILEID>FCB? ABORT" Invalid fileid"  >R
 ;   PUSHICB  ICB ICBSOURCEID + !
-;   BEGIN  R@ 2@ -  WHILE
-;       R@ NEXT-LINE ( len len+CRLF R:fcb)
-;       R@ @ ( len len+CRLF pos R:fcb) ROT OVER + ( len+CRLF pos end) ICB 2!
-;       R@ +!
+;   BEGIN  SOURCE-ID FILEID>FCB DUP  2@ <>  WHILE
+;       DUP @ ( fcb start) OVER NEXT-LINE ( fcb start end crlfend)
+;       -ROT ICB 2! ( fcb crlfend) SWAP !
 ;       INTERPRET
 ;   REPEAT
-;   R> FCB>FILEID CLOSE-FILE DROP  POPICB ;
+;   DROP  SOURCE-ID CLOSE-FILE DROP  POPICB ;
 
             LINKTO(FILESIZE,0,12,'E',"LIF-EDULCNI")
 INCLUDEFILE:JMP     ENTER
-            .WORD   DUP,FILEIDTOFCBQ,zbranch,_includefile1
-            .WORD   PSQUOTE,14
-            .BYTE   "Invalid fileid"
-            .WORD   TYPE,ABORT
-_includefile1:.WORD TOR,PUSHICB,ICB,LIT,ICBSOURCEID,PLUS,STORE
-_includefile2:.WORD RFETCH,TWOFETCH,MINUS,zbranch,_includefile3
-            .WORD   RFETCH,NEXTLINE,RFETCH,FETCH,ROT,OVER,PLUS,ICB,TWOSTORE
-            .WORD   RFETCH,PLUSSTORE,INTERPRET,branch,_includefile2
-_includefile3:.WORD RFROM,FCBTOFILEID,CLOSEFILE,DROP,POPICB,EXIT
+            .WORD   PUSHICB,ICB,LIT,ICBSOURCEID,PLUS,STORE
+_includefile1:.WORD SOURCEID,FILEIDTOFCB,DUP
+            .WORD       TWOFETCH,NOTEQUALS,zbranch,_includefile2
+            .WORD   DUP,FETCH,OVER,NEXTLINE
+            .WORD   DASHROT,ICB,TWOSTORE,SWAP,STORE
+            .WORD   INTERPRET,branch,_includefile1
+_includefile2:.WORD DROP,SOURCEID,CLOSEFILE,DROP,POPICB,EXIT
 
 
 
@@ -520,6 +512,19 @@ FCBTOFILEID:JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
+; FILEID>FCB [MFORTH] "fileid-to-fcb" ( fileid -- fcb-addr )
+;
+; Return the address of the File Control Block for the given fileid.  An
+; ambiguous condition exists if fileid is invalid.
+;
+; : FILEID>FCB ( fileid -- fcb-addr)   255 AND 1- FCBSTART + ;
+
+            LINKTO(FCBTOFILEID,0,10,'B',"CF>DIELIF")
+FILEIDTOFCB: JMP    ENTER
+            .WORD   LIT,255,AND,ONEMINUS,LIT,FCBSTART,PLUS,EXIT
+
+
+; ----------------------------------------------------------------------
 ; FILEID>FCB? [MFORTH] "fileid-to-fcb-question" ( fileid -- ior | fcb-addr 0 )
 ;
 ; Return the address of the File Control Block for the given fileid, or
@@ -532,7 +537,7 @@ FCBTOFILEID:JMP     ENTER
 ;   DUP FCBADDR + @ 0= IF DROP IORBADFILEID EXIT THEN
 ;   IOROK ;
 
-            LINKTO(FCBTOFILEID,0,11,'?',"BCF>DIELIF")
+            LINKTO(FILEIDTOFCB,0,11,'?',"BCF>DIELIF")
 FILEIDTOFCBQ:JMP    ENTER
             .WORD   DUP,LIT,8,RSHIFT,SWAP,LIT,255,AND
             .WORD   DUP,ZEROEQUALS,OVER,LIT,MAXFCBS*8,GREATERTHAN
@@ -608,13 +613,14 @@ _newfcb2:   .WORD   DROP,LIT,8,pplusloop,_newfcb1
 
 
 ; ----------------------------------------------------------------------
-; NEXT-LINE [MFORTH] ( fcb -- u1 u2 )
+; NEXT-LINE [MFORTH] ( fcb -- addr1 addr2 )
 ;
 ; Read forward from the current position in the file identified by fcb
 ; until either a CRLF sequence is found or the end of file is reached.
-; u1 is the number of bytes in the current line of the file (ignoring the
-; CRLF sequence, if any).  u2 is the number of bytes actually read, which
-; will normally be u1+2 if the line was terminated with a CRLF.
+; addr1 is the address of the end of the current line in the file (ignoring
+; the CRLF sequence, if any).  addr2 is the address of the end of the current
+; line, including the CRLF sequence.  addr2 will normally be addr1+2 if the
+; line was terminated with a CRLF.
 ;
 ; ---
 ; \ The loop in this method takes advantage of the fact that all M100 files
@@ -622,17 +628,17 @@ _newfcb2:   .WORD   DROP,LIT,8,pplusloop,_newfcb1
 ; \ file, even if this is the last character in the file.  We will never read
 ; \ a byte from another file in this situation, because the second character
 ; \ will be EOF.
-; : NEXT-LINE ( fcb -- u1 u2)
-;   2@ TUCK - 2>B 0 FORB B @ 0x0A0D = IF DUP 1+ 1+ EXIT THEN 1+ NEXTB DUP ;
+; : NEXT-LINE ( fcb -- addr1 addr2)
+;   2@ TUCK - 2>B FORB B @ 0x0A0D = IF B DUP 1+ 1+ EXIT THEN NEXTB B DUP ;
 
             LINKTO(NEWFCB,0,9,'E',"NIL-TXEN")
 NEXTLINE:   JMP     ENTER
-            .WORD   TWOFETCH,TUCK,MINUS,TWOTOB,ZERO
+            .WORD   TWOFETCH,TUCK,MINUS,TWOTOB
 _nextline1: .WORD   BQUES,zbranch,_nextline3
             .WORD   B,FETCH,LIT,0A0Dh,EQUALS,zbranch,_nextline2
-            .WORD   DUP,ONEPLUS,ONEPLUS,EXIT
-_nextline2: .WORD   ONEPLUS,BPLUS,branch,_nextline1
-_nextline3: .WORD   DUP,EXIT
+            .WORD   B,DUP,ONEPLUS,ONEPLUS,EXIT
+_nextline2: .WORD   BPLUS,branch,_nextline1
+_nextline3: .WORD   B,DUP,EXIT
 
 
 ; ----------------------------------------------------------------------
