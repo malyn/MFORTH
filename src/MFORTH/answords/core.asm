@@ -574,7 +574,7 @@ TWOSWAP:    SAVEDE
 ; : [CORE] 6.1.0450 "colon" ( C: "<spaces>name" -- colon-sys )
 ;
 ; Skip leading space delimiters.  Parse name delimited by a space.  Create
-; a definition for name, called a “colon definition”.  Enter compilation
+; a definition for name, called a "colon definition".  Enter compilation
 ; state and start the current definition, producing colon-sys.  Append the
 ; initiation semantics given below to the current definition.
 ;
@@ -952,7 +952,7 @@ ALLOT:      JMP     ENTER
 ; ----------------------------------------------------------------------
 ; AND [CORE] 6.1.0720 ( x1 x2 -- x3 )
 ;
-; x3 is the bit-by-bit logical “and” of x1 with x2.
+; x3 is the bit-by-bit logical "and" of x1 with x2.
 
             LINKTO(ALLOT,0,3,'D',"NA")
 AND:        SAVEDE
@@ -1126,7 +1126,7 @@ CHARS:      NEXT                ; No-op in MFORTH, because chars are 1 byte.
 ; Skip leading space delimiters.  Parse name delimited by a space.  Create
 ; a definition for name with the execution semantics defined below.
 ;
-; name is referred to as a “constant”.
+; name is referred to as a "constant".
 ;
 ; name Execution: ( -- x )
 ;   Place x on the stack.
@@ -2647,7 +2647,7 @@ LTBRACKET:  LXI     H,0
 ;   An ambiguous condition exists if name is not found.
 ;
 ; Run-time: ( -- xt )
-;   Place name’s execution token xt on the stack.  The execution token
+;   Place name's execution token xt on the stack.  The execution token
 ;   returned by the compiled phrase "['] X " is the same value returned by
 ;   "' X " outside of compilation state.
 ;
