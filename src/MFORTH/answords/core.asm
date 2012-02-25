@@ -1923,7 +1923,7 @@ _quit2:     .WORD   branch,_quit1
 ;   Move x from the return stack to the data stack.
 
             LINKTO(QUIT,0,2,'>',"R")
-RFROM       RSPOP(H,L)
+RFROM:      RSPOP(H,L)
             PUSH    H
             NEXT
 

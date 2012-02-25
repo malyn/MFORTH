@@ -240,12 +240,12 @@ WORDOFFSET: .EQU    64          ; Offset from HERE to WORD buffer.
 WORDSIZE:   .EQU    258         ; Size of WORD buffer.
 HLDEND:     .EQU    WORDOFFSET+WORDSIZE ; End (and thus, start) of HLD.
 SQOFFSET:   .EQU    HLDEND      ; Offset from HERE to S" buffer.
-SQSIZE      .EQU    80          ; Size of S" buffer.
+SQSIZE:     .EQU    80          ; Size of S" buffer.
 PADOFFSET:  .EQU    SQOFFSET+SQSIZE ; Offset from HERE to first PAD buffer.
-PADSIZE     .EQU    256         ; Size of each task's PAD buffer.
+PADSIZE:    .EQU    256         ; Size of each task's PAD buffer.
 
-MAXICBS     .EQU    8           ; Maximum number of active input sources.
-MAXFCBS     .EQU    8           ; Maximum number of files open at one time.
+MAXICBS:    .EQU    8           ; Maximum number of active input sources.
+MAXFCBS:    .EQU    8           ; Maximum number of files open at one time.
 
 
 
@@ -271,10 +271,10 @@ OPON        .EQU    ALTBGN +  0
 #ECHO "\t*** ERROR: OPON is too large; Global Variables expect OPONLEN<=16 ***\n"
 #ENDIF
 
-HOLDH       .EQU    ALTBGN + 16
-HOLDD       .EQU    ALTBGN + 18
-INTH        .EQU    ALTBGN + 20
-INTD        .EQU    ALTBGN + 22
+HOLDH:      .EQU    ALTBGN + 16
+HOLDD:      .EQU    ALTBGN + 18
+INTH:       .EQU    ALTBGN + 20
+INTD:       .EQU    ALTBGN + 22
 
 DP:         .EQU    ALTBGN + 24 ; Data Pointer.
 BOPSTK:     .EQU    ALTBGN + 26 ; Initial value of SP on entry to MFORTH.
@@ -307,7 +307,7 @@ FCBSTART:   .EQU    ALTBGN + 128; Start of the 8, 8-byte File Control Blocks.
 ; third User Variable is 4 (0, 2, 4) and not 2 (0, 1, 2).
 ; ======================================================================
 
-USERSAVEDSP .EQU    0           ; Saved stack pointer
+USERSAVEDSP:.EQU    0           ; Saved stack pointer
 USERBASE:   .EQU    2           ; Number-conversion radix pointer.
 USERB:      .EQU    4           ; "B" register
 USERBEND:   .EQU    6           ; "B" register end
@@ -528,7 +528,7 @@ OPONIMG:    DI
             POP     PSW         ; Now in Option ROM; restore A+PSW.
             EI
             RET                 ; Return to whatever called STDCALL/INTCALL.
-OPONLEN     .EQU    $-OPONIMG   ; Calculate length of OPON for use by INIT.
+OPONLEN:    .EQU    $-OPONIMG   ; Calculate length of OPON for use by INIT.
 
 
 

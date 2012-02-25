@@ -32,10 +32,10 @@
 ; ----------------------------------------------------------------------
 ; I/O Result Codes
 ;
-IOROK       .EQU    0           ; No error.
-IORFNF      .EQU    1           ; File not found or invalid filename (>6 chars)
-IORRDONLY   .EQU    2           ; Files cannot be opened R/W.
-IORBADFILEID .EQU   3           ; Bad fileid.
+IOROK:      .EQU    0           ; No error.
+IORFNF:     .EQU    1           ; File not found or invalid filename (>6 chars)
+IORRDONLY:  .EQU    2           ; Files cannot be opened R/W.
+IORBADFILEID:.EQU   3           ; Bad fileid.
 
 
 
