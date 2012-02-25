@@ -792,4 +792,26 @@ _latest         .EQU    LAST_PROFILER
 
             .ORG    07FFFh
             .BYTE   0
+
+
+
+; ======================================================================
+; Perfect Hash of ROM Dictionary
+; ======================================================================
+
+#IFNDEF PHASH
+; Temporarily store _latest at 07FFD for use by phashgen.exe.
+            .ORG    07FFEh
+            .WORD   _latest-NFATOCFASZ
+#ELSE
+; phash.asm already generated.
+#include "phash.asm"
+#ENDIF
+
+
+
+; ======================================================================
+; End of ROM.
+; ======================================================================
+
             .END
