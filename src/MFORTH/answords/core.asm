@@ -2959,7 +2959,7 @@ _foundqNEXT:LDAX    D           ; Get the next dictionary value into A.
             ORI     00100000b   ; Only a match if A-Z/a-z.  Force to lower,
             CPI     'a'         ; ..then see if less than 'a'.
             JM      _foundqFLSE ; ..If so, this is not a match.
-            CPI     'z'         ; If greater than 'z',
+            CPI     'z'+1       ; If greater than 'z'+1,
             JP      _foundqFLSE ; ..then this is also not a match.
 _foundqMTCH:LDAX    D           ; The strings are a match if this is the last
             ANI     10000000b   ; ..character in the name (high bit set).
