@@ -1,4 +1,4 @@
-; Copyright (c) 2009-2010, Michael Alyn Miller <malyn@strangeGizmo.com>.
+; Copyright (c) 2009-2011, Michael Alyn Miller <malyn@strangeGizmo.com>.
 ; All rights reserved.
 ;
 ; Redistribution and use in source and binary forms, with or without
@@ -751,7 +751,10 @@ LINK_DOUBLE     .EQU    LAST_COREEXT
 LINK_FACILITY   .EQU    LAST_DOUBLE
 #include "answords/facility.asm"
 
-LINK_FILE       .EQU    LAST_FACILITY
+LINK_FACILITYEXT .EQU   LAST_FACILITY
+#include "answords/facility-ext.asm"
+
+LINK_FILE       .EQU    LAST_FACILITYEXT
 #include "answords/file.asm"
 
 LINK_STRING     .EQU    LAST_FILE

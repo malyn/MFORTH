@@ -815,17 +815,25 @@ FETCH:      POP     H           ; Pop address to fetch into HL
 ;
 ; ---
 ; : ABORT ( i*x -- ) ( R: j*x -- )
-;   TASK [HEX] FF OR SP!  10 BASE !  QUIT ;
+;   TASK-PAGE [HEX] FF OR SP!  10 BASE !
+;   TASK-PAGE 'FIRSTTASK @ = IF QUIT ELSE ['] BL STOPPED THEN ;
 ;
-; QUIT should never return, but we HALT anyway just in case someone
-; messes with the return stack.
+; Our multitasking-aware version of ABORT enters the QUIT loop if this
+; is the initial task, otherwise the STOPPED loop is invoked and the
+; task effectively becomes inert.  STOPPED needs an xt to call, so we
+; give it BL.  That puts a value on the stack, but since STOPPED will
+; never exit the value won't bother anyone.
+;
+; The idle word should never return, but we HALT anyway just in case
+; someone messes with the return stack.
 
             LINKTO(FETCH,0,5,'T',"ROBA")
 ABORT:      JMP     ENTER
-            .WORD   TASK,LIT,0ffh,OR,SPSTORE
+            .WORD   TASKPAGE,LIT,0ffh,OR,SPSTORE
             .WORD   LIT,10,BASE,STORE
-            .WORD   QUIT
-            .WORD   HALT
+            .WORD   TASKPAGE,LIT,TICKFIRSTTASK,FETCH,EQUALS,zbranch,_abort1
+            .WORD   QUIT,HALT
+_abort1:    .WORD   LIT,BL,STOPPED,HALT
 
 
 ; ----------------------------------------------------------------------
@@ -1228,11 +1236,11 @@ DECIMAL:    JMP     ENTER
 ; before +n was placed on the stack.
 ;
 ; ---
-; : DEPTH ( -- +n)   SP  TASK [HEX] FF OR  SWAP - 2/ ;
+; : DEPTH ( -- +n)   SP  TASK-PAGE [HEX] FF OR  SWAP - 2/ ;
 
             LINKTO(DECIMAL,0,5,'H',"TPED")
 DEPTH:      JMP     ENTER
-            .WORD   SP,TASK,LIT,0ffh,OR,SWAP,MINUS,TWOSLASH,EXIT
+            .WORD   SP,TASKPAGE,LIT,0ffh,OR,SWAP,MINUS,TWOSLASH,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -1652,20 +1660,16 @@ J:          RSPICK2(H,L)        ; Get the second loop index (the 3rd RS item)
 ; control characters have an environmental dependency.
 ;
 ; ---
-; TODO: Apparently the Model 100 does magical, special things here and can
-; convert function keys to text (maybe we can use this as a macro feature?),
-; and sets Carry when the key is "special".  We probably want to avoid "special"
-; keys and just accept non-special keys.  For now we just take the easy route.
+; NOTE: Wake up from power off generates a null key event, which we need
+; to ignore.
+;
+; : KEY ( -- char)   BEGIN  BEGIN PAUSE KEY? UNTIL  (KEY) ?DUP 0<> UNTIL ;
 
             LINKTO(J,0,3,'Y',"EK")
-KEY:        CALL    STDCALL     ; Call the
-            .WORD   012CBh      ; ..CHGET routine.
-            ANA     A           ; Wake up from power off generates a null key
-            JZ      KEY         ; ..event, which we need to ignore.
-            MVI     H,0         ; Clear H,
-            MOV     L,A         ; ..put the character in L,
-            PUSH    H           ; ..and push the character onto the stack.
-            NEXT
+KEY:        JMP     ENTER
+_key1:      .WORD   PAUSE,KEYQ,zbranch,_key1
+            .WORD   PKEY,QDUP,ZERONOTEQUALS,zbranch,_key1
+            .WORD   EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -3202,6 +3206,36 @@ _phashDONE: POP     H           ; Pop the hash values into HL.
 
 
 ; ----------------------------------------------------------------------
+; (KEY) [MFORTH] "paren-key-paren" ( -- char )
+;
+; Receive one character char, a member of the implementation-defined
+; character set.  Keyboard events that do not correspond to such characters
+; are discarded until a valid character is received, and those events are
+; subsequently unavailable.
+;
+; All standard characters can be received.  Characters received by KEY are
+; not displayed.
+;
+; Any standard character returned by KEY has the numeric value specified in
+; 3.1.2.1 Graphic characters.  Programs that require the ability to receive
+; control characters have an environmental dependency.
+;
+; ---
+; TODO: Apparently the Model 100 does magical, special things here and can
+; convert function keys to text (maybe we can use this as a macro feature?),
+; and sets Carry when the key is "special".  We probably want to avoid "special"
+; keys and just accept non-special keys.  For now we just take the easy route.
+
+            LINKTO(PFIND,0,5,029h,"YEK(")
+PKEY:       CALL    STDCALL     ; Call the
+            .WORD   012CBh      ; ..CHGET routine.
+            MVI     H,0         ; Clear H,
+            MOV     L,A         ; ..put the character in L,
+            PUSH    H           ; ..and push the character onto the stack.
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; HERE>CHAIN [MFORTH] "here-to-chain" ( addr -- )
 ;
 ; Store HERE in the zero-terminated chain beginning at addr.  Each addr
@@ -3213,7 +3247,7 @@ _phashDONE: POP     H           ; Pop the hash values into HL.
 ; HERE>CHAIN ( addr -- )
 ;   BEGIN ?DUP WHILE DUP @ HERE ( a a' h) ROT ! REPEAT ;
 
-            LINKTO(PFIND,0,10,'N',"IAHC>EREH")
+            LINKTO(PKEY,0,10,'N',"IAHC>EREH")
 HERETOCHAIN:JMP     ENTER
 _htc1:      .WORD   QDUP,zbranch,_htc2
             .WORD   DUP,FETCH,HERE,ROT,STORE,branch,_htc1

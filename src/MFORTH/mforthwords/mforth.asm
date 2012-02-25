@@ -96,6 +96,26 @@ TWONIP:     SAVEDE
 
 
 ; ----------------------------------------------------------------------
+; GET-XY [MFORTH] "get-x-y" ( -- u1 u2 )
+;
+; Return the current cursor position (column u1, row u2) from the
+; current input device, the upper left corner of which is column zero,
+; row zero.
+
+            LINKTO(TWONIP,0,6,'Y',"X-TEG")
+GETXY:      MVI     H,0         ; Initialize H with zero.
+            LDA     0F63Ah      ; Get the column into A,
+            DCR     A           ; ..subtract one,
+            MOV     L,A         ; ..move it to L,
+            PUSH    H           ; ..and push the result to the stack.
+            LDA     0F639h      ; Get the row into A,
+            DCR     A           ; ..subtract one,
+            MOV     L,A         ; ..move it to L,
+            PUSH    H           ; ..and push the result to the stack.
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; COLD [MFORTH] ( i*x -- ) ( R: j*x -- )
 ;
 ; Clear the screen, display our copyright/help message, (re)insert our ROM
@@ -111,7 +131,7 @@ TWONIP:     SAVEDE
 ; ABORT should never return, but we HALT anyway just in case someone
 ; messes with the return stack.
 
-            LINKTO(TWONIP,0,4,'D',"LOC")
+            LINKTO(GETXY,0,4,'D',"LOC")
 COLD:       JMP     ENTER
             .WORD   PAGE,DOTVER,LIT,2,SPACES
             .WORD   PSQUOTE,22

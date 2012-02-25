@@ -224,7 +224,7 @@ NIP:        POP     H           ; Pop x2 into HL.
 ; data for intermediate processing.
 ;
 ; ---
-; : PAD ( -- c-addr)   HERE  PADOFFSET +  TASK 'FIRSTTASK @ -  8 LSHIFT  + ;
+; : PAD ( -- c-addr)   HERE  PADOFFSET +  TASK-PAGE 'FIRSTTASK @ -  8 LSHIFT  + ;
 
             LINKTO(NIP,0,3,'D',"AP")
 PAD:        PUSH    D           ; Save DE.
