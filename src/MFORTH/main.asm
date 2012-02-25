@@ -29,8 +29,8 @@
 ; MFORTH Version Information
 ; ======================================================================
 
-MFORTH_MAJOR    .EQU    0
-MFORTH_MINOR    .EQU    9
+MFORTH_MAJOR    .EQU    1
+MFORTH_MINOR    .EQU    0
 ;MFORTH_CHANGE  .EQU    Supplied on the TASM command line.
 
 
