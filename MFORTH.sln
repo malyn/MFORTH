@@ -1,0 +1,21 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhashGen", "src\PhashGen\PhashGen.csproj", "{3E5B4535-051B-4D90-8B56-303113EBAA71}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ToolLib", "src\ToolLib\ToolLib.csproj", "{FC0301A8-374E-46C9-82F4-2F3266566E47}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Mixed Platforms = Debug|Mixed Platforms
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3E5B4535-051B-4D90-8B56-303113EBAA71}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{3E5B4535-051B-4D90-8B56-303113EBAA71}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{FC0301A8-374E-46C9-82F4-2F3266566E47}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{FC0301A8-374E-46C9-82F4-2F3266566E47}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
