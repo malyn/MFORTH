@@ -1,0 +1,7 @@
+bin
+obj
+tools
+*.SCC
+*.suo
+*.vspscc
+*.vssscc
