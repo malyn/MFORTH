@@ -632,13 +632,29 @@ _newfcb2:   .WORD   DROP,LIT,8,pplusloop,_newfcb1
 ;   2@ TUCK - 2>B FORB B @ 0x0A0D = IF B DUP 1+ 1+ EXIT THEN NEXTB B DUP ;
 
             LINKTO(NEWFCB,0,9,'E',"NIL-TXEN")
-NEXTLINE:   JMP     ENTER
-            .WORD   TWOFETCH,TUCK,MINUS,TWOTOB
-_nextline1: .WORD   BQUES,zbranch,_nextline3
-            .WORD   B,FETCH,LIT,0A0Dh,EQUALS,zbranch,_nextline2
-            .WORD   B,DUP,ONEPLUS,ONEPLUS,EXIT
-_nextline2: .WORD   BPLUS,branch,_nextline1
-_nextline3: .WORD   B,DUP,EXIT
+NEXTLINE:   POP     H           ; Get FCB into HL.
+            MOV     A,M         ; Get the FCBPOS[l] into A,
+            INX     H           ; ..increment to FCBPOS[h],
+            MOV     H,M         ; ..put FCBPOS[h] into H,
+            MOV     L,A         ; ..then put FCBPOS[l] into L.
+_nextline1: MOV     A,M         ; Get the next byte into A,
+            CPI     01Ah        ; ..see if it is EOF,
+            JZ      _nextlineEOF; ..and then exit if so.
+            CPI     00Dh        ; See if it is CR,
+            INX     H           ; ..move to the next byte,
+            JNZ     _nextline1  ; ..and continue looping if not CR.
+            MOV     A,M         ; See if the byte after CR
+            CPI     00Ah        ; ..is LF,
+            JNZ     _nextline1  ; ..and if not then continue looping.
+            DCX     H           ; Otherwise decrement HL to before the CR,
+            PUSH    H           ; ..push addr1,
+            INX     H           ; ..increment past the CR
+            INX     H           ; ..and LF,
+            PUSH    H           ; ..then push addr2.
+            JMP     _nextlineDONE;We're done.
+_nextlineEOF:PUSH   H           ; Push addr1.
+            PUSH    H           ; Push addr2.
+_nextlineDONE:NEXT
 
 
 ; ----------------------------------------------------------------------

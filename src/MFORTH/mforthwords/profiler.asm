@@ -50,24 +50,23 @@ _printprof2:.WORD   NFATOLFA,FETCH,DUP,ZEROEQUALS,zbranch,_printprof1
 
 
 ; ----------------------------------------------------------------------
-; PROFILE [MFORTH] ( xt -- )
+; PROFILE [MFORTH] ( i*x xt -- j*x )
 ;
 ; Profile the given xt.
 ;
 ; ---
-; : PROFILE ( xt -- )
-;   CLEAR-PROFILER
-;   1 PROFILING !  0 PROFILETICKS !  EXECUTE  PROFILETICKS @  0 PROFILING !
-;   CR ." Total time:" 2* 2* U. ." ms" ;
+; : PROFILE ( i*x xt -- j*x)
+;   CLEAR-PROFILER  1 PROFILING !  TIMED-EXECUTE  0 PROFILING !
+;   TICKS>MS CR ." Total time:" UD. ." ms";
 
             LINKTO(PRINTPROFILE,0,7,'E',"LIFORP")
 PROFILE:    JMP     ENTER
-            .WORD   CLEARPROFILE
-            .WORD   ONE,LIT,PROFILING,STORE,ZERO,LIT,PROFILETICKS,STORE
-            .WORD   EXECUTE,LIT,PROFILETICKS,FETCH,ZERO,LIT,PROFILING,STORE
-            .WORD   CR,PSQUOTE,12
+            .WORD   CLEARPROFILE,ONE,LIT,PROFILING,STORE
+            .WORD   TIMEDEXECUTE
+            .WORD   ZERO,LIT,PROFILING,STORE
+            .WORD   TICKSTOMS,CR,PSQUOTE,12
             .BYTE   "Total time: "
-            .WORD   TYPE,TWOSTAR,TWOSTAR,UDOT,PSQUOTE,2
+            .WORD   TYPE,UDDOT,PSQUOTE,2
             .BYTE   "ms"
             .WORD   TYPE,EXIT
 

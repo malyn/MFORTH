@@ -209,6 +209,8 @@ STACKGUARD: .EQU    076h        ; The guard value used to see if a Task
 ; ======================================================================
 
 NFASZ:      .EQU    1           ; Size of the Name Field.
+#DEFINE     INXNFATOLFA(r) INX r
+
 LFASZ:      .EQU    2           ; Size of the Link Field.
 
 #IFNDEF PROFILER
@@ -283,8 +285,9 @@ TICKPREVLEAVE:.EQU  ALTBGN + 44 ; Pointer to the previous LEAVE in a DO..LOOP.
 TICKPREVENDB:.EQU   ALTBGN + 46 ; Pointer to the previous ?ENDB in a FORB..NEXTB
 TICKICB:    .EQU    ALTBGN + 48 ; Address of the current Input Control Block.
 PROFILING:  .EQU    ALTBGN + 50 ; Non-zero if the profiler is on.
-PROFILETICKS:.EQU   ALTBGN + 52 ; Number of ticks (4us) for profile run.
-; 10 bytes free.
+TICKTICKS:  .EQU    ALTBGN + 52 ; (double) Number of ticks (4ms) since start.
+SAVEB:      .EQU    ALTBGN + 56 ; DE is saved here when used as a temporary.
+; 6 bytes free.
 ICBSTART:   .EQU    ALTBGN + 64 ; Start of the 8, 8-byte Input Control Blocks.
 FCBSTART:   .EQU    ALTBGN + 128; Start of the 8, 8-byte File Control Blocks.
 ; 128 bytes free.
@@ -315,6 +318,13 @@ USERBEND:   .EQU    6           ; "B" register end
 
 #DEFINE     SAVEDE      XCHG\ SHLD SAVED
 #DEFINE     RESTOREDE   LHLD SAVED\ XCHG
+
+
+; ----------------------------------------------------------------------
+; Save and restore BC (corrupts HL).
+
+#DEFINE     SAVEBC      MOV H,B\ MOV L,C\ SHLD SAVEB
+#DEFINE     RESTOREBC   LHLD SAVEB\ MOV B,H\ MOV C,L
 
 
 
@@ -408,13 +418,20 @@ INT65:      CALL    INTCALL
 
 INT75:      CALL    INTCALL
             .WORD   0003Ch
-#IFDEF PROFILER
             PUSH    H
-            LHLD    PROFILETICKS; Get the current profile tick counter.
-            INX     H           ; Add one to the counter.
-            SHLD    PROFILETICKS; And save the counter.
+            CALL    INCTICKS
             POP     H
-#ENDIF
+            RET
+INCTICKS:   LXI     H,TICKTICKS
+            INR     M
+            RNZ
+            INX     H
+            INR     M
+            RNZ
+            INX     H
+            INR     M
+            RNZ
+            INR     M
             RET
 
         
@@ -692,6 +709,11 @@ _init1:     LDAX    D           ; Load value from [DE]
             ; Disable the profiler.
             LXI     H,0
             SHLD    PROFILING
+            
+            ; Reset the tick counter.
+            LXI     H,0
+            SHLD    TICKTICKS
+            SHLD    TICKTICKS+2
             
             ; Enable interrupts and jump to COLD (which never returns).
             EI

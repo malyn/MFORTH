@@ -103,20 +103,35 @@ QENDB:      JMP     ENTER
 ; : B ( -- c-addr)  'B @ ;
 
             LINKTO(QENDB,0,1,'B',"")
-B:          JMP     ENTER
-            .WORD   TICKB,FETCH,EXIT
+B:          MOV     H,B
+            MVI     L,USERB
+            MOV     A,M         ; Load LSB of cell value into A
+            INX     H           ; Increment to MSB of the cell value
+            MOV     H,M         ; Load MSB of the cell value into H
+            MOV     L,A         ; Move LSB of cell value from A to L
+            PUSH    H           ; Push cell value onto stack.
+            NEXT
 
 
 ; ----------------------------------------------------------------------
-; B! [MFORTH] "b-store" ( -- c-addr)
+; B! [MFORTH] "b-store" ( c -- )
 ;
 ; Pop a byte from the stack and store it at B.
 ;
 ; : B! (c --)   B C! ;
 
             LINKTO(B,0,2,'!',"B")
-BSTORE:     JMP     ENTER
-            .WORD   B,CSTORE,EXIT
+BSTORE:     MOV     H,B
+            MVI     L,USERB
+            MOV     A,M         ; Load LSB of cell value into A
+            INX     H           ; Increment to MSB of the cell value
+            MOV     H,M         ; Load MSB of the cell value into H
+            MOV     L,A         ; Move LSB of cell value from A to L
+            XTHL                ; Get c into L,
+            MOV     A,L         ; ..then move c into A,
+            POP     H           ; ..restore store HL.
+            MOV     M,A         ; ..and store c at HL.
+            NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -140,8 +155,22 @@ BSTOREPLUS: JMP     ENTER
 ; : B# ( -- u)   'Bend @  B  - ;
 
             LINKTO(BSTOREPLUS,0,2,'#',"B")
-BNUMBER:    JMP     ENTER
-            .WORD   TICKBEND,FETCH,B,MINUS,EXIT
+BNUMBER:    PUSH    B
+            MOV     H,B
+            MVI     L,USERB
+            MOV     C,M         ; Load LSB of cell value into C
+            INX     H           ; Increment to MSB of the cell value
+            MOV     B,M         ; Load MSB of the cell value into B.
+            MVI     L,USERBEND
+            MOV     A,M         ; Load LSB of cell value into A
+            INX     H           ; Increment to MSB of the cell value
+            MOV     H,M         ; Load MSB of the cell value into H
+            MOV     L,A         ; Move LSB of cell value from A to L
+            DSUB
+            XTHL
+            MOV     B,H
+            MOV     C,L
+            NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -152,8 +181,13 @@ BNUMBER:    JMP     ENTER
 ; : B+ ( --)  1 CHARS 'B +! ;
 
             LINKTO(BNUMBER,0,2,'+',"B")
-BPLUS:      JMP     ENTER
-            .WORD   ONE,CHARS,TICKB,PLUSSTORE,EXIT
+BPLUS:      MOV     H,B         ; Get the address of the B user variable
+            MVI     L,USERB     ; ..into HL.
+            INR     M           ; Increment the B user variable;
+            JNZ     _bplusDONE  ; ..we're done if the low byte didn't roll.
+            INX     H           ; Otherwise increment to the high byte
+            INR     M           ; ..and propagate the overflow.
+_bplusDONE: NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -164,8 +198,24 @@ BPLUS:      JMP     ENTER
 ; : B? ( -- f)   B# 0 > ;
 
             LINKTO(BPLUS,0,2,'?',"B")
-BQUES:      JMP     ENTER
-            .WORD   BNUMBER,ZERO,GREATERTHAN,EXIT
+BQUES:      PUSH    B
+            MOV     H,B
+            MVI     L,USERB
+            MOV     C,M         ; Load LSB of cell value into C
+            INX     H           ; Increment to MSB of the cell value
+            MOV     B,M         ; Load MSB of the cell value into B.
+            MVI     L,USERBEND
+            MOV     A,M         ; Load LSB of cell value into A
+            INX     H           ; Increment to MSB of the cell value
+            MOV     H,M         ; Load MSB of the cell value into H
+            MOV     L,A         ; Move LSB of cell value from A to L
+            DSUB
+            JZ      _bquesDONE  ; Leave zero in HL and we're done; otherwise
+            LXI     H,0FFFFh    ; ..put true in HL.
+_bquesDONE: XTHL
+            MOV     B,H
+            MOV     C,L
+            NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -176,8 +226,17 @@ BQUES:      JMP     ENTER
 ; : B@ ( -- c)   B C@ ;
 
             LINKTO(BQUES,0,2,'@',"B")
-BFETCH:     JMP     ENTER
-            .WORD   B,CFETCH,EXIT
+BFETCH:     MOV     H,B
+            MVI     L,USERB
+            MOV     A,M         ; Load LSB of cell value into A
+            INX     H           ; Increment to MSB of the cell value
+            MOV     H,M         ; Load MSB of the cell value into H
+            MOV     L,A         ; Move LSB of cell value from A to L
+            MOV     A,M         ; Load target byte into A,
+            MOV     L,A         ; ..put target byte into L,
+            MVI     H,0         ; ..clear the high byte,
+            PUSH    H           ; ..and then push the byte to the stack.
+            NEXT
 
 
 ; ----------------------------------------------------------------------

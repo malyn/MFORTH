@@ -47,6 +47,25 @@ _zneqDONE:  PUSH    H           ; Push the flag to the stack.
 
 
 ; ----------------------------------------------------------------------
+; 2>R [CORE EXT] 6.2.0340 "two-to-r"
+;
+; Interpretation:
+;   Interpretation semantics for this word are undefined.
+;
+; Execution: ( x1 x2 -- ) ( R:  -- x1 x2 )
+;   Transfer cell pair x1 x2 to the return stack.  Semantically equivalent
+;   to SWAP >R >R.
+
+            LINKTO(ZERONOTEQUALS,0,3,'R',">2")
+TWOTOR:     POP     H           ; Pop x2 from the stack,
+            XTHL                ; ..and then swap x1 with x2.;
+            RSPUSH(H,L)         ; Push x1 to the return stack.
+            POP     H           ; Pop x2 from the stack again,
+            RSPUSH(H,L)         ; ..then push x2 to the return stack.
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; 2R> [CORE EXT] 6.2.0410 "two-r-from"
 ;
 ; Interpretation:
@@ -56,7 +75,7 @@ _zneqDONE:  PUSH    H           ; Push the flag to the stack.
 ;   Transfer cell pair x1 x2 from the return stack.  Semantically equivalent
 ;   to R> R> SWAP.
 
-            LINKTO(ZERONOTEQUALS,0,3,'>',"R2")
+            LINKTO(TWOTOR,0,3,'>',"R2")
 TWORFROM:   RSPOP(H,L)          ; Pop x2 from the return stack
             PUSH    H           ; ..and push it to the stack (which is wrong).
             RSPOP(H,L)          ; Pop x1 from the return stack,
@@ -108,6 +127,29 @@ AGAIN:      JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
+; C" [CORE] 6.2.0855 "c-quote"
+;
+; Interpretation:
+;   Interpretation semantics for this word are undefined.
+;
+; Compilation: ( "ccc<quote>" -- )
+;   Parse ccc delimited by " (double-quote).  Append the run-time
+;   semantics given below to the current definition.
+;
+; Run-time: ( -- c-addr )
+;   Return c-addr, a counted string consisting of the characters ccc.
+;   A program shall not alter the returned string.
+;
+; : C" ( "ccc<quote>" --)   ['] (C") COMPILE,
+;   [CHAR] " WORD  DUP C@ 1+  HERE ( ca size dp) OVER ALLOT SWAP MOVE ;
+
+            LINKTO(AGAIN,1,2,022h,"C")
+CQUOTE:     JMP     ENTER
+            .WORD   LIT,PCQUOTE,COMPILECOMMA,LIT,022h,WORD,DUP,CFETCH,ONEPLUS
+            .WORD   HERE,OVER,ALLOT,SWAP,MOVE,EXIT
+
+
+; ----------------------------------------------------------------------
 ; COMPILE, [CORE EXT] 6.2.0945 "compile-comma" ( xt -- )
 ;
 ; Interpretation:
@@ -117,7 +159,7 @@ AGAIN:      JMP     ENTER
 ;   Append the execution semantics of the definition represented by xt to
 ;   the execution semantics of the current definition.  
 
-            LINKTO(AGAIN,0,8,02Ch,"ELIPMOC")
+            LINKTO(CQUOTE,0,8,02Ch,"ELIPMOC")
 COMPILECOMMA:JMP    ENTER
             .WORD   COMMA,EXIT
 
@@ -230,7 +272,6 @@ TIB:        LHLD    TICKTIB
 ; Copy the first (top) stack item below the second stack item.
 
             LINKTO(TIB,0,4,'K',"CUT")
-LAST_COREEXT:
 TUCK:       SAVEDE
             POP     D           ; Pop x2 into DE.
             POP     H           ; Pop x1 into HL.
@@ -238,4 +279,26 @@ TUCK:       SAVEDE
             PUSH    H           ; Push x1 onto the stack.
             PUSH    D           ; Push x2 onto the stack again.
             RESTOREDE
+            NEXT
+
+
+
+; ======================================================================
+; CORE EXT Words (implementation details)
+; ======================================================================
+
+; ----------------------------------------------------------------------
+; (c") [MFORTH] "paren-c-quote-paren" ( -- c-addr )
+;
+; Runtime behavior of C": return c-addr.
+
+            LINKTO(TUCK,0,4,029h,"\"c(")
+LAST_COREEXT:
+PCQUOTE:    PUSH    D           ; Push string address onto the stack.
+            LHLX                ; Read string count from instruction stream.
+            MVI     H,0         ; Clear high byte, which is not part of count.
+            INX     H           ; Increment HL to include the count byte.
+            XCHG                ; IP to HL, count to DE.
+            DAD     D           ; Add count to address to skip over string.
+            XCHG                ; Put IP back in DE (pointing after string).
             NEXT

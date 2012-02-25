@@ -1429,23 +1429,67 @@ _fill2:     .WORD   DROP,EXIT
 ; also return one (1), otherwise also return minus-one (-1).  For a given
 ; string, the values returned by FIND while compiling may differ from
 ; those returned while not compiling.
-;
-; : FIND ( c-addr -- c-addr 0 | xt 1 | xt -1 )
-;   0  LATEST @ >B
-;   BEGIN
-;       OVER B FOUND? IF
-;           2DROP  B NFA>CFA  B@ 128 AND 0= 1 OR  EXIT
-;       THEN
-;   B 1+ @ DUP >B 0= UNTIL ;
 
             LINKTO(FILL,0,4,'D',"NIF")
-FIND:       JMP     ENTER
-            .WORD   ZERO,LATEST,FETCH,TOB
-_find1:     .WORD   OVER,B,FOUNDQ,zbranch,_find2
-            .WORD   TWODROP,B,NFATOCFA
-            .WORD   BFETCH,LIT,128,AND,ZEROEQUALS,ONE,OR,EXIT
-_find2:     .WORD   B,ONEPLUS,FETCH,DUP,TOB,ZEROEQUALS,zbranch,_find1
-            .WORD   EXIT
+FIND:       SAVEDE
+            LHLD    TICKLATEST  ; Get the latest dictionary pointer
+            XCHG                ; ..and put that into DE.
+            POP     H           ; Pop the counted string pointer
+            SHLD    HOLDH       ; ..and cache the value.
+_findAGAIN: LDAX    D           ; Get the name length into A.
+            ANI     01111111b   ; Strip the immediate bit.
+            CMP     M           ; Compare the two lengths+smudge bits.
+            JNZ     _findNEXTWORD;Jump if not zero (not equal) to the next word.
+            XCHG                ; Swap HL and DE,
+            SHLD    HOLDD       ; ..save DE (since we're about to change it),
+            XCHG                ; ..and then put DE and HL back again.
+            DCX     D           ; Go to the first dictionary char (prev byte).
+            INX     H           ; Go to the first string character.
+_findNEXTCHAR:LDAX  D           ; Get the next dictionary value into A.
+            ANI     01111111b   ; Strip the end-of-name bit.
+            CMP     M           ; Compare the two characters.
+            JZ      _findMATCHCHAR;Jump if zero (equal) to match.
+            XRI     00100000b   ; Try switching the case
+            CMP     M           ; ..and then repeating the match.
+            JNZ     _findNEXTWORDDE;..Not a match if not zero (not equal).
+            ORI     00100000b   ; Only a match if A-Z/a-z.  Force to lower,
+            CPI     'a'         ; ..then see if less than 'a'.
+            JM      _findNEXTWORDDE;..If so, this is not a match.
+            CPI     'z'+1       ; If greater than 'z'+1,
+            JP      _findNEXTWORDDE;..then this is also not a match.
+_findMATCHCHAR:LDAX D           ; The strings are a match if this is the last
+            ANI     10000000b   ; ..character in the name (high bit set).
+            JNZ     _findMATCH  ; We're done if this is a match.
+            DCX     D           ; Go to the next dictionary char (prev byte).
+            INX     H           ; Go to the next string character.
+            JMP     _findNEXTCHAR;Evaluate the next character.
+_findMATCH: LHLD    HOLDD       ; Restore DE (which is now pointing at a char)
+            XCHG                ; ..and then swap that value back into DE.
+            LDAX    D           ; Get the flags into A
+            ANI     10000000b   ; ..and focus on just the immediate flag.
+            INXNFATOCFA(D)      ; Skip ahead to the CFA (xt)
+            PUSH    D           ; ..and push xt to the stack.
+            JNZ     _findIMM    ; Immediate gets a 1 pushed to the stack,
+            LXI     H,0FFFFh    ; ..non-immediate gets a -1
+            PUSH    H           ; ..pushed to the stack.
+            JMP     _findDONE   ; We're done.
+_findIMM:   LXI     H,1         ; Immediate word, so push 1
+            PUSH    H           ; ..to the stack.
+            JMP     _findDONE   ; We're done.
+_findNEXTWORDDE:LHLD HOLDD      ; Restore DE (which is now pointing at a char)
+            XCHG                ; ..and then swap that value back into DE.
+_findNEXTWORD:INXNFATOLFA(D)    ; Move to the word's LFA,
+            LHLX                ; ..get the LFA in HL,
+            XCHG                ; ..put the LFA into DE,
+            LHLD    HOLDH       ; ..and restore HL.
+            MOV     A,D         ; Keep searching for a match
+            ORA     E           ; ..if the LFA
+            JNZ     _findAGAIN  ; ..is not zero.
+            PUSH    H           ; Otherwise push c-addr
+            LXI     H,0         ; ..and false
+            PUSH    H           ; ..to the stack.
+_findDONE:  RESTOREDE
+            NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -1776,11 +1820,23 @@ MOD:        JMP     ENTER
 ; : MOVE ( addr1 addr2 u --)   2>B FORB DUP C@ B! 1+ NEXTB DROP ;
 
             LINKTO(MOD,0,4,'E',"VOM")
-MOVE:       JMP     ENTER
-            .WORD   TWOTOB
-_move1:     .WORD   BQUES,zbranch,_move2
-            .WORD   DUP,CFETCH,BSTORE,ONEPLUS,BPLUS,branch,_move1
-_move2:     .WORD   DROP,EXIT
+MOVE:       SAVEDE
+            SAVEBC
+            POP     B           ; Pop u into BC.
+            POP     D           ; Pop addr2 into DE.
+            POP     H           ; Pop addr1 into HL.
+_move1:     MOV     A,B         ; We're done if B
+            ORA     C           ; ..and C
+            JZ      _moveDONE   ; ..are zero.
+            MOV     A,M         ; Copy the next byte from [HL]
+            STAX    D           ; ..to [DE]
+            INX     H           ; ..and then increment both HL
+            INX     D           ; ..and DE.
+            DCX     B           ; Decrement BC
+            JMP     _move1      ; ..and continue looping.
+_moveDONE:  RESTOREBC
+            RESTOREDE
+            NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -2494,34 +2550,87 @@ WHILE:      JMP     ENTER
 ; program shall not depend on the existence of the space.
 ;
 ; ---
-; "B? IF 1+ THEN" skips the delimiter that stopped the second FORB loop.  We
-; know we hit a delimiter if we didn't hit the end of B.
-;
 ; : WORD ( char "<chars>ccc<char>" -- c-addr)
-;   SOURCE >IN @ /STRING  2>B
-;   'WORD  0 OVER C!  1+  ( char caCurrent)
-;   FORB OVER B@ <> ?ENDB NEXTB
-;   FORB OVER B@ =  ?ENDB B@ OVER C! 1+ NEXTB
-;   NIP  BL OVER C!  'WORD 1+ - 'WORD C!
-;   B SOURCE DROP -  B? IF 1+ THEN  >IN !
-;   'WORD ;
+;   SOURCE >IN @ /STRING ( char src srclen) 'WORD (word) >IN +! ;
 
             LINKTO(WHILE,0,4,'D',"ROW")
 WORD:       JMP     ENTER
-            .WORD   SOURCE,TOIN,FETCH,SLASHSTRING,TWOTOB
-            .WORD   TICKWORD,ZERO,OVER,CSTORE,ONEPLUS
-_word1:     .WORD   BQUES,zbranch,_word2
-            .WORD   OVER,BFETCH,NOTEQUALS,INVERT,zbranch,_word2
-            .WORD   BPLUS,branch,_word1
-_word2:     .WORD   BQUES,zbranch,_word3
-            .WORD   OVER,BFETCH,EQUALS,INVERT,zbranch,_word3
-            .WORD   BFETCH,OVER,CSTORE,ONEPLUS,BPLUS,branch,_word2
-_word3:     .WORD   NIP,BL,OVER,CSTORE,TICKWORD,ONEPLUS,MINUS,TICKWORD,CSTORE
-            .WORD   B,SOURCE,DROP,MINUS,BQUES,zbranch,_word4
-            .WORD   ONEPLUS
-_word4:     .WORD   TOIN,STORE
-            .WORD   TICKWORD
-            .WORD   EXIT
+            .WORD   SOURCE,TOIN,FETCH,SLASHSTRING,TICKWORD,pword
+            .WORD   TOIN,PLUSSTORE,EXIT
+
+; : (word) ( char src srclen word -- word srcadj) ...
+;   A=char HL=srcpos DE=wordpos C=srcrem
+
+            LINKTO(WORD,0,6,029h,"drow(")
+pword:      SAVEDE
+            SAVEBC
+            POP     D           ; Get word in DE.
+            POP     B           ; Get srclen in C,
+            MOV     A,C         ; ..then temporarily move srclen to A.
+            POP     H           ; Get src in HL.
+            POP     B           ; Get char in C,
+            MOV     B,C         ; ..then move char to B,
+            MOV     C,A         ; ..and srclen to C.
+            
+            PUSH    D           ; Push word
+            PUSH    H           ; ..and src for use in the DONE label.
+            
+            MVI     A,0         ; Initialize the word length
+            STAX    D           ; ..to zero
+            INX     D           ; ..and advance to the first char in word.
+
+            INR     C           ; See if srclen was
+            DCR     C           ; ..zero
+            JZ      _pwordNOBYTES;..and skip the loops if so.
+            
+_pwordSKIP: MOV     A,M         ; Get the next char at srcpos
+            CMP     B           ; ..and see if it is the same as the delim;
+            JNZ     _pwordPRECOPY;..start copying if so.
+            INX     H           ; Advance to the next src location,
+            DCR     C           ; ..decrement srclen,
+            JNZ     _pwordSKIP  ; ..and keep copying if there are more chars.
+
+_pwordNOBYTES:PUSH  H           ; No bytes to copy, so push srcpos as copystart
+            JMP     _pwordDONE  ; ..and then jump to the end.
+
+_pwordPRECOPY:PUSH  H           ; Push srcpos as copystart to the stack.
+_pwordCOPY: MOV     A,M         ; Get the next char at srcpos
+            CMP     B           ; ..and see if it is the same as delim;
+            JZ      _pwordDONE  ; ..we're done copying is so.
+            STAX    D           ; Copy the character to wordpos,
+            INX     D           ; ..advance wordpos,
+            INX     H           ; ..advance srcpos,
+            DCR     C           ; ..decrement srclen,
+            JNZ     _pwordCOPY  ; ..and keep copying if there are more chars.
+
+_pwordDONE: MVI     A,' '       ; Write out the trailing space that is
+            STAX    D           ; ..supposed to be present after the word.
+
+            INR     C           ; See if we hit srclen, in which case we do
+            DCR     C           ; ..not need to skip the (missing) final delim.
+            
+            POP     D           ; Pop copystart into DE.
+            POP     B           ; Pop the initial src into BC.
+            PUSH    H           ; Preserve the final srcpos (aka copyend).
+            JZ      _pwordDONEEOL;Hit EOL if we hit srclen, so no final delim;
+            DCX     B           ; ..otherwise decrement src to skip final delim.
+_pwordDONEEOL:DSUB              ; HL=copyend-src (aka srcadj)
+
+            XTHL                ; Swap srcadj for copyend.
+            MOV     B,D         ; Get copystart into B
+            MOV     C,E         ; ..and C.
+            DSUB                ; HL=copyend-copystart (aka wordlen)
+            MOV     A,L         ; Get wordlen in A,
+            POP     H           ; ..then pop srcadj back into HL,
+            POP     D           ; ..and the original word pointer into DE;
+            STAX    D           ; ..then store copylen at word[0].
+            
+            PUSH    D           ; Push word
+            PUSH    H           ; ..and srcadj to the stack.
+            
+            RESTOREBC
+            RESTOREDE
+            NEXT
 
 
 ; ----------------------------------------------------------------------
@@ -2529,7 +2638,7 @@ _word4:     .WORD   TOIN,STORE
 ;
 ; x3 is the bit-by-bit exclusive-or of x1 with x2.
 
-            LINKTO(WORD,0,3,'R',"OX")
+            LINKTO(pword,0,3,'R',"OX")
 XOR:        SAVEDE
             POP     H           ; Pop x2.
             POP     D           ; Pop x1.
@@ -2944,62 +3053,6 @@ ENDLOOP:    JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
-; FOUND? [MFORTH] "found-question" ( c-addr nfa-addr -- flag )
-;
-; Compares the counted string c-addr to the name of the dictionary entry
-; pointed to by nfa-addr (which points to the length field) and pushes
-; true to the stack if the names are identical (ignoring case), false
-; otherwise.
-;
-; : FOUND? ( c-addr nfa-addr -- flag )  -- missing the upper/lower conversion
-;   OVER C@  OVER C@ 127 AND  <> IF FALSE EXIT THEN
-;   BEGIN
-;       OVER C@  OVER C@ 127 AND <> IF FALSE EXIT THEN
-;       1- SWAP 1+ SWAP -- or just 1 /STRING
-;   C@ 128 AND UNTIL  2DROP TRUE ;
-;
-; Note that the length is not used as a loop index, instead we just look
-; for the terminal bit in the last character of the name.  We do have to
-; compare the length separately though, as otherwise the immediate bit
-; would look like the terminal bit.
-
-            LINKTO(DIGITQ,0,6,'?',"DNUOF")
-FOUNDQ:     SAVEDE
-            POP     D           ; Pop the dictionary pointer.
-            POP     H           ; Pop the counted string pointer.
-            LDAX    D           ; Get the name length into A.
-            ANI     01111111b   ; Strip the immediate bit.
-            CMP     M           ; Compare the two lengths+smudge bits.
-            JNZ     _foundqFLSE ; Jump if not zero (not equal) to false.
-            DCX     D           ; Go to the first dictionary char (prev byte).
-            INX     H           ; Go to the first string character.
-_foundqNEXT:LDAX    D           ; Get the next dictionary value into A.
-            ANI     01111111b   ; Strip the end-of-name bit.
-            CMP     M           ; Compare the two characters.
-            JZ      _foundqMTCH ; Jump if zero (equal) to match.
-            XRI     00100000b   ; Try switching the case
-            CMP     M           ; ..and then repeating the match.
-            JNZ     _foundqFLSE ; ..Not a match if not zero (not equal).
-            ORI     00100000b   ; Only a match if A-Z/a-z.  Force to lower,
-            CPI     'a'         ; ..then see if less than 'a'.
-            JM      _foundqFLSE ; ..If so, this is not a match.
-            CPI     'z'+1       ; If greater than 'z'+1,
-            JP      _foundqFLSE ; ..then this is also not a match.
-_foundqMTCH:LDAX    D           ; The strings are a match if this is the last
-            ANI     10000000b   ; ..character in the name (high bit set).
-            JNZ     _foundqTRUE ; We're done if this is a match.
-            DCX     D           ; Go to the next dictionary char (prev byte).
-            INX     H           ; Go to the next string character.
-            JMP     _foundqNEXT ; Evaluate the next character.
-_foundqTRUE:LXI     H,0FFFFh    ; Put true in HL.
-            JMP     _foundqDONE ; We're done.
-_foundqFLSE:LXI     H,0         ; Put false in HL.
-_foundqDONE:PUSH    H           ; Push the flag to the stack.
-            RESTOREDE
-            NEXT
-
-
-; ----------------------------------------------------------------------
 ; HERE>CHAIN [MFORTH] "here-to-chain" ( addr -- )
 ;
 ; Store HERE in the zero-terminated chain beginning at addr.  Each addr
@@ -3010,7 +3063,7 @@ _foundqDONE:PUSH    H           ; Push the flag to the stack.
 ; HERE>CHAIN ( addr -- )
 ;   BEGIN ?DUP WHILE DUP @ HERE ( a a' h) ROT ! REPEAT ;
 
-            LINKTO(FOUNDQ,0,10,'N',"IAHC>EREH")
+            LINKTO(DIGITQ,0,10,'N',"IAHC>EREH")
 HERETOCHAIN:JMP     ENTER
 _htc1:      .WORD   QDUP,zbranch,_htc2
             .WORD   DUP,FETCH,HERE,ROT,STORE,branch,_htc1

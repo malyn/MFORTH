@@ -181,7 +181,8 @@ INITRP:     MVI     C,07Fh
 ;
 ; : INS-ROMTRIG ( --)
 ;   FIND-ROMTRIG  DUP 0= IF FREDIR THEN  >B
-;   240 B!+  255 B!+ 255 B!+  S" MFORTH" B SWAP MOVE  BL B!+ BL B!+ ;
+;   240 B!+  255 B!+ 255 B!+  S" MFORTH" B SWAP  DUP B + >B  MOVE
+;   BL B!+ BL B!+ ;
 ; : FIND-ROMTRIG ( -- 0 | addr)
 ;   [ USRDIR 11 - ] LITERAL  BEGIN NXTDIR DUP WHILE
 ;       DUP C@ 16 AND IF EXIT THEN REPEAT ;
@@ -192,7 +193,7 @@ INSROMTRIG: JMP     ENTER
 _insromtrig1:.WORD  TOB,LIT,240,BSTOREPLUS,LIT,255,BSTOREPLUS,LIT,255,BSTOREPLUS
             .WORD   PSQUOTE,6
             .BYTE   "MFORTH"
-            .WORD   B,SWAP,MOVE,BL,BSTOREPLUS,BL,BSTOREPLUS
+            .WORD   B,SWAP,DUP,B,PLUS,TOB,MOVE,BL,BSTOREPLUS,BL,BSTOREPLUS
             .WORD   EXIT
 
             LINKTO(INSROMTRIG,0,12,'G',"IRTMOR-DNIF")
@@ -264,7 +265,50 @@ SP:         LXI     H,0
 ; Set the stack pointer to a-addr.
 
             LINKTO(SP,0,3,'!',"PS")
-LAST_MFORTH:
 SPSTORE:    POP     H
             SPHL
             NEXT
+
+
+; ----------------------------------------------------------------------
+; TICKS [MFORTH] ( -- ud )
+;
+; ud is the number of ticks that have elapsed since MFORTH was started.
+
+            LINKTO(SPSTORE,0,5,'S',"KCIT")
+TICKS:      DI
+            LHLD    TICKTICKS
+            PUSH    H
+            LHLD    TICKTICKS+2
+            EI
+            PUSH    H
+            NEXT
+
+
+; ----------------------------------------------------------------------
+; TICKS>MS [MFORTH] "ticks-to-m-s" ( ud1 -- ud2 )
+;
+; Convert a tick count (ud1) to a value in milliseconds (ud2).
+;
+; ---
+; : TICKS>MS ( ud1 -- ud2)   D2* D2* ;
+
+            LINKTO(TICKS,0,8,'S',"M>SKCIT")
+TICKSTOMS:  JMP     ENTER
+            .WORD   DTWOSTAR,DTWOSTAR,EXIT
+
+
+; ----------------------------------------------------------------------
+; TIMED-EXECUTE [MFORTH] ( i*x xt -- j*x ud )
+;
+; Execute the given xt and return the approximate number of milliseconds
+; required for execution.
+;
+; ---
+; : TIMED-EXECUTE ( i*x xt -- j*x ud)
+;   TICKS 2>R  EXECUTE  TICKS 2R>  D- ;
+
+            LINKTO(TICKSTOMS,0,13,'E',"TUCEXE-DEMIT")
+LAST_MFORTH:
+TIMEDEXECUTE:JMP    ENTER
+            .WORD   TICKS,TWOTOR,EXECUTE,TICKS,TWORFROM,DMINUS,EXIT
