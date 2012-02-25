@@ -91,7 +91,7 @@ MFORTH_MINOR    .EQU    9
 ;   +--------------------------------+  FFFFh
 ;
 ;
-; Temporary Regions (based on HERE):
+; Transient Regions (based on HERE):
 ;
 ;   +--------------------------------+  [TICKTIB] + TIBSIZE aka [DP] aka HERE
 ;   | Empty; space for the header and|
@@ -103,7 +103,9 @@ MFORTH_MINOR    .EQU    9
 ;   |              vvvv              |
 ;   |              ^^^^              |
 ;   |       Buffer used by HLD       |
-;   +--------------------------------+  [DP] + PADOFFSET aka [DP] + HLDEND
+;   +--------------------------------+  [DP] + SQOFFSET aka [DP] + HLDEND
+;   |           S" buffer            |
+;   +--------------------------------+  [DP] + PADOFFSET
 ;   |     PAD buffer for Task #0     |
 ;   +--------------------------------+  [DP] + PADOFFSET + tasknum*PADSIZE
 ;   | Additional per-task PAD buffers|
@@ -237,8 +239,11 @@ TIBSIZE:    .EQU    80          ; Length of the Terminal Input Buffer.
 WORDOFFSET: .EQU    64          ; Offset from HERE to WORD buffer.
 WORDSIZE:   .EQU    258         ; Size of WORD buffer.
 HLDEND:     .EQU    WORDOFFSET+WORDSIZE ; End (and thus, start) of HLD.
-PADOFFSET:  .EQU    HLDEND      ; Offset from HERE to first PAD buffer.
+SQOFFSET:   .EQU    HLDEND      ; Offset from HERE to S" buffer.
+SQSIZE      .EQU    80          ; Size of S" buffer.
+PADOFFSET:  .EQU    SQOFFSET+SQSIZE ; Offset from HERE to first PAD buffer.
 PADSIZE     .EQU    256         ; Size of each task's PAD buffer.
+
 MAXICBS     .EQU    8           ; Maximum number of active input sources.
 MAXFCBS     .EQU    8           ; Maximum number of files open at one time.
 

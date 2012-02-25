@@ -67,11 +67,11 @@ NUMSIGN:    JMP     ENTER
 ; string.  c-addr and u specify the resulting character string.  A program
 ; may replace characters within the string.
 ;
-; : #> ( xd -- c-addr u ) DROP DROP HLD @ PAD OVER - ;
+; : #> ( xd -- c-addr u ) DROP DROP  HLD @  HERE HLDEND +  OVER - ;
 
             LINKTO(NUMSIGN,0,2,'>',"#")
 NUMSIGNGRTR:JMP     ENTER
-            .WORD   DROP,DROP,HLD,FETCH,PAD,OVER,MINUS
+            .WORD   DROP,DROP,HLD,FETCH,HERE,LIT,HLDEND,PLUS,OVER,MINUS
             .WORD   EXIT
 
 
@@ -129,7 +129,7 @@ _tick1:     .WORD   EXIT
 ;
 ; ---
 ; TODO: Need to implement the extended FILE logic.  I recommend that we modify
-;       this code to use REFILL.  We should also avoid WORD altogether and
+;       this code to use REFILL.  We could also avoid PARSE altogether and
 ;       just go through the input source on our own.  Note that we need to
 ;       rewrite this in assembly language so that we don't get hit by the
 ;       perf issues of processing one byte at a time in high-level code.
@@ -2032,7 +2032,7 @@ _rshiftDONE:PUSH    H           ; Push the result (HL).
 ; Interpretation:
 ;   Interpretation semantics for this word are undefined.
 ;
-;   Extended by FILE:
+;   Extended by FILE: ( "ccc<quote>" -- c-addr u )
 ;       Parse ccc delimited by " (double quote).  Store the resulting
 ;       string c-addr u at a temporary location.  The maximum length of
 ;       the temporary buffer is implementation-dependent but shall be no
@@ -2047,13 +2047,23 @@ _rshiftDONE:PUSH    H           ; Push the result (HL).
 ;   Return c-addr and u describing a string consisting of the characters
 ;   ccc.  A program shall not alter the returned string.
 ;
-; : S" ( "ccc<quote>" --)   ['] (S") COMPILE,
-;   [CHAR] " PARSE  DUP ,  HERE OVER ALLOT SWAP CMOVE ;
+; : S" ( "ccc<quote>" --)
+;   [CHAR] " PARSE ( caS uS)
+;   STATE @ 0= IF  DUP 'S"SIZE > ABORT" String too long"
+;       'S" OVER 2SWAP ( caD uS caS uS)  'S"
+;   ELSE ['] (S") COMPILE,  DUP ,  HERE OVER ALLOT THEN
+;   ( caS uS caD) SWAP CMOVE ;
 
             LINKTO(RSHIFT,1,2,022h,"S")
 SQUOTE:     JMP     ENTER
-            .WORD   LIT,PSQUOTE,COMPILECOMMA,LIT,022h,PARSE,DUP,COMMA
-            .WORD   HERE,OVER,ALLOT,SWAP,CMOVE,EXIT
+            .WORD   LIT,022h,PARSE,STATE,FETCH,ZEROEQUALS,zbranch,_squote2
+            .WORD   DUP,LIT,SQSIZE,GREATERTHAN,zbranch,_squote1
+            .WORD   PSQUOTE,12
+            .BYTE   "String too long"
+            .WORD   TYPE,ABORT
+_squote1:   .WORD   TICKSQUOTE,OVER,TWOSWAP,TICKSQUOTE,branch,_squote3
+_squote2:   .WORD   LIT,PSQUOTE,COMPILECOMMA,DUP,COMMA,HERE,OVER,ALLOT
+_squote3:   .WORD   SWAP,CMOVE,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -2637,11 +2647,26 @@ ICBTOIN:    .EQU    6           ; Offset to >IN value.
 ; ======================================================================
 
 ; ----------------------------------------------------------------------
+; 'S" [MFORTH] "tick-s-quote" ( -- addr )
+;
+; addr is the address of the start of the S" buffer.
+
+            LINKTO(RTBRACKET,0,3,022h,"S\'")
+TICKSQUOTE: LHLD    DP
+            PUSH    D
+            LXI     D,SQOFFSET
+            DAD     D
+            XTHL
+            XCHG
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; 'WORD [MFORTH] "tick-word" ( -- addr )
 ;
 ; addr is the address of the start of the WORD buffer.
 
-            LINKTO(RTBRACKET,0,5,'D',"ROW\'")
+            LINKTO(TICKSQUOTE,0,5,'D',"ROW\'")
 TICKWORD:   LHLD    DP
             PUSH    D
             LXI     D,WORDOFFSET
