@@ -1,4 +1,4 @@
-; Copyright (c) 2009-2010, Michael Alyn Miller <malyn@strangeGizmo.com>.
+; Copyright (c) 2009-2012, Michael Alyn Miller <malyn@strangeGizmo.com>.
 ; All rights reserved.
 ;
 ; Redistribution and use in source and binary forms, with or without
@@ -54,10 +54,10 @@ DASHROT:    SAVEDE
 ;
 ; ---
 ; : .VER ( --)
-;   ." MFORTH v"
+;   ." MFORTH "
 ;   MFORTH_MAJOR [CHAR] 0 + EMIT  [CHAR] . EMIT
 ;   MFORTH_MINOR [CHAR] 0 + EMIT  [CHAR] . EMIT
-;   BASE @  HEX  MFORTH_CHANGE 0 <# # # # # #> TYPE  BASE !
+;   S" <<MFORTH_COMMIT>>" DROP 4 TYPE
 ;   [ PROFILER ] [IF] [CHAR] P EMIT [ELSE] SPACE [THEN] ;
 
             LINKTO(DASHROT,0,4,'R',"EV.")
@@ -67,9 +67,9 @@ DOTVER:     JMP     ENTER
             .WORD   TYPE
             .WORD   LIT,MFORTH_MAJOR,LIT,'0',PLUS,EMIT,LIT,'.',EMIT
             .WORD   LIT,MFORTH_MINOR,LIT,'0',PLUS,EMIT,LIT,'.',EMIT
-            .WORD   BASE,FETCH,HEX,LIT,MFORTH_CHANGE,ZERO
-            .WORD   LESSNUMSIGN,NUMSIGN,NUMSIGN,NUMSIGN,NUMSIGN,NUMSIGNGRTR
-            .WORD   TYPE,BASE,STORE
+            .WORD   PSQUOTE,7
+            .BYTE   MFORTH_COMMIT
+            .WORD   DROP,LIT,4,TYPE
 #IFDEF PROFILER
             .WORD   LIT,'P',EMIT
 #ELSE

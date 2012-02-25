@@ -17,16 +17,16 @@ REM Enable the line below to generate a build with the MFORTH profiler.
 REM SET PROFILER=-dPROFILER
 
 
-REM Get the Perforce change number for this build if -v was specified.
-IF "%1"=="-v" (GOTO :getchange) ELSE (GOTO :nochange)
+REM Get the Git commit hash for this build if -v was specified.
+IF "%1"=="-v" (GOTO :getcommit) ELSE (GOTO :nocommit)
 
-:getchange
-FOR /F "Tokens=2" %%I IN ('p4 changes -i -m 1 //depot/main/MFORTH/src/...#have') DO SET MFORTH_CHANGE=%%I
-ECHO Change number is %MFORTH_CHANGE%.
+:getcommit
+FOR /F "Tokens=1" %%I IN ('git log -1 --oneline HEAD') DO SET MFORTH_COMMIT="%%I"
+ECHO Commit hash is %MFORTH_COMMIT%.
 GOTO assemble
 
-:nochange
-SET MFORTH_CHANGE=0
+:nocommit
+SET MFORTH_COMMIT="0000000"
 GOTO assemble
 
 
@@ -41,7 +41,7 @@ CD %SRCDIR%
 
 REM Assemble MFORTH using the standard, linked-list dictionary.
 %TASM% -85 -s -b -f00 ^
-	%PROFILER% -dMFORTH_CHANGE=%MFORTH_CHANGE% ^
+	%PROFILER% -dMFORTH_COMMIT="\"%MFORTH_COMMIT%\"" ^
 	main.asm ^
 	%BINDIR%\MFORTH.BX ^
 	%BINDIR%\MFORTH.LST ^
@@ -56,7 +56,7 @@ REM Use PhashGen to generate a perfect hash table for the dictionary.
 
 REM Assemble MFORTH again, this time using the perfect hash table.
 %TASM% -85 -s -b -f00 ^
-	%PROFILER% -dPHASH -dMFORTH_CHANGE=%MFORTH_CHANGE% ^
+	%PROFILER% -dPHASH -dMFORTH_COMMIT="\"%MFORTH_COMMIT%\"" ^
 	main.asm ^
 	%BINDIR%\MFORTH.BX ^
 	%BINDIR%\MFORTH.LST ^

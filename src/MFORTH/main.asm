@@ -1,4 +1,4 @@
-; Copyright (c) 2009-2011, Michael Alyn Miller <malyn@strangeGizmo.com>.
+; Copyright (c) 2009-2012, Michael Alyn Miller <malyn@strangeGizmo.com>.
 ; All rights reserved.
 ;
 ; Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
 
 MFORTH_MAJOR    .EQU    1
 MFORTH_MINOR    .EQU    1
-;MFORTH_CHANGE  .EQU    Supplied on the TASM command line.
+;MFORTH_COMMIT  .EQU    Supplied on the TASM command line.
 
 
 
