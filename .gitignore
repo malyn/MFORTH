@@ -1,6 +1,7 @@
 bin
 obj
 tools
+phash.asm
 *.SCC
 *.suo
 *.vspscc
