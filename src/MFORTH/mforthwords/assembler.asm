@@ -46,7 +46,7 @@ ENDCODE:    JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
-; NEXT [MFORTH]
+; NEXT [MFORTH] ( -- )
 ;
 ; Compile the code for NEXT into the current code definition.
 
@@ -64,11 +64,23 @@ asmNEXT:    JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
-; RESTOREREGS [MFORTH]
+; ROMCALL [MFORTH] ( addr -- )
+;
+; Call the Main ROM routine identified by addr.
+
+            LINKTO(asmNEXT,0,7,'L',"LACMOR")
+asmROMCALL:     JMP  ENTER
+            .WORD   LIT,STDCALL,asmCALL
+            .WORD   COMMA
+            .WORD   EXIT
+
+
+; ----------------------------------------------------------------------
+; RESTOREREGS [MFORTH] ( -- )
 ;
 ; Restore BC and DE (corrupts HL).
 
-            LINKTO(asmNEXT,0,11,'S',"GEREROTSER")
+            LINKTO(asmROMCALL,0,11,'S',"GEREROTSER")
 asmRESTOREREGS:JMP  ENTER
             .WORD   LIT,SAVEB,asmLHLD
             .WORD   asmOpH,asmOpB,asmMOV
@@ -79,7 +91,7 @@ asmRESTOREREGS:JMP  ENTER
 
 
 ; ----------------------------------------------------------------------
-; SAVEREGS [MFORTH]
+; SAVEREGS [MFORTH] ( -- )
 ;
 ; Save BC and DE (corrupts HL).
 
