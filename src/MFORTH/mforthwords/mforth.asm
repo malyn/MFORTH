@@ -126,11 +126,46 @@ COPY:       JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
+; COPY-LINE [MFORTH] ( addr1 addr2 u1 -- u2 u3 )
+;
+; If u1 is greater than zero, copy the contents of u1 consecutive address
+; units at addr1 to the u1 consecutive address units at addr2, stopping if
+; a CRLF sequence is found or end-of-file is reached before u1 address units
+; have been copied.  After COPY-LINE completes, the u2 consecutive address
+; units at addr2 contain exactly what the u2 consecutive address units at
+; addr1 contained before the move.  u2 is the number of address units that
+; were copied.  u3 is the number of address units that should be skipped
+; in addr1 before the next call to COPY-LINE.  u3 will normally be u2+2 if
+; CRLF was reached before u1 or EOF was reached.  Note that EOF is not
+; included in u3, only CRLF is included in u3.
+;
+; ---
+; : COPY-LINE ( addr1 addr2 u1 -- u2 u3)
+;   ROT SWAP 2>B DUP ( addr2 addr2') FORB
+;   B@ 26 = ?ENDB
+;   B@ 13 = B# 1 > AND IF B 1+ C@ 10 = IF SWAP - DUP 1+ 1+ EXIT THEN THEN
+;   B@ OVER C! 1+ NEXTB
+;   SWAP - DUP ;
+
+            LINKTO(COPY,0,8,'E',"NIL-YPOC")
+COPYLINE:   JMP     ENTER
+            .WORD   ROT,SWAP,TWOTOB,DUP
+_copyline1: .WORD   BQUES,zbranch,_copyline3
+            .WORD   BFETCH,LIT,26,EQUALS,INVERT,zbranch,_copyline3
+            .WORD   BFETCH,LIT,13,EQUALS,BNUMBER,ONE,GREATERTHAN,AND
+            .WORD       zbranch,_copyline2
+            .WORD   B,ONEPLUS,CFETCH,LIT,10,EQUALS,zbranch,_copyline2
+            .WORD   SWAP,MINUS,DUP,ONEPLUS,ONEPLUS,EXIT
+_copyline2: .WORD   BFETCH,OVER,CSTORE,ONEPLUS,BPLUS,branch,_copyline1
+_copyline3: .WORD   SWAP,MINUS,DUP,EXIT
+
+
+; ----------------------------------------------------------------------
 ; HALT [MFORTH] ( -- )
 ;
 ; Halt the processor.
 
-            LINKTO(COPY,0,4,'T',"LAH")
+            LINKTO(COPYLINE,0,4,'T',"LAH")
 HALT:       HLT                 ; Halt the processor.
             NEXT
 

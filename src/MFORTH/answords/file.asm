@@ -305,7 +305,7 @@ RW:         JMP     ENTER
 ; \ all of our files are in memory anyway.  COPY is like MOVE, but it returns
 ; \ the number of bytes copied.  This becomes important later for READ-LINE,
 ; \ which uses COPY-LINE.  COPY-LINE will copy up to the given number of bytes
-; \ or until a CRLF is read, whichever happens first.  That's why we are
+; \ or until a CRLF or EOF is read, whichever happens first.  That's why we are
 ; \ using COPY here instead of the equivalent DUP >R MOVE R> sequence.
 ; : READ-FILE ( c-addr u1 fileid -- u2 ior)
 ;   FILEID>FCB? ?DUP IF NIP NIP 0 SWAP EXIT THEN  ( ca u1 fcb)
@@ -346,6 +346,18 @@ _readfile1: .WORD   DUP,TOR,FETCH,DASHROT,COPY,RFETCH,TWOFETCH,MINUS,MIN
 ;
 ; At the conclusion of the operation, FILE-POSITION returns the next file
 ; position after the last character read.
+;
+; ---
+; : READ-LINE ( c-addr u1 fileid -- u2 ior)
+;   FILEID>FCB? ?DUP IF NIP NIP 0 SWAP EXIT THEN  ( ca u1 fcb)
+;   DUP >R @ ( ca u1 pos R:fcb) -ROT COPY-LINE ( u2 cnt R:fcb)
+;   R> +! IOROK ;
+
+            LINKTO(READFILE,0,9,'E',"NIL-DAER")
+READLINE:    JMP    ENTER
+            .WORD   FILEIDTOFCBQ,QDUP,zbranch,_readline1,NIP,NIP,ZERO,SWAP,EXIT
+_readline1: .WORD   DUP,TOR,FETCH,DASHROT,COPYLINE
+            .WORD   RFROM,PLUSSTORE,LIT,IOROK,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -356,6 +368,15 @@ _readfile1: .WORD   DUP,TOR,FETCH,DASHROT,COPY,RFETCH,TWOFETCH,MINUS,MIN
 ; positioned outside the file boundaries.
 ;
 ; At the conclusion of the operation, FILE-POSITION returns the value ud.
+;
+; ---
+; : REPOSITION-FILE ( ud fileid -- ior)
+;   FILEID>FCB? ?DUP IF EXIT THEN  +!  IOROK ;
+
+            LINKTO(READLINE,0,15,'E',"LIF-NOITISOPER")
+REPOSFILE:   JMP    ENTER
+            .WORD   FILEIDTOFCBQ,QDUP,zbranch,_reposfile,EXIT
+_reposfile: .WORD   PLUSSTORE,LIT,IOROK,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -374,7 +395,7 @@ _readfile1: .WORD   DUP,TOR,FETCH,DASHROT,COPY,RFETCH,TWOFETCH,MINUS,MIN
 ; ---
 ; Always fails in MFORTH as the file system is read-only.
 
-            LINKTO(READFILE,0,11,'E',"LIF-EZISER")
+            LINKTO(REPOSFILE,0,11,'E',"LIF-EZISER")
 RESIZEFILE: JMP     ENTER
             .WORD   TWODROP,LIT,IORRDONLY,EXIT
 
