@@ -311,6 +311,7 @@ USERSAVEDSP .EQU    0           ; Saved stack pointer
 USERBASE:   .EQU    2           ; Number-conversion radix pointer.
 USERB:      .EQU    4           ; "B" register
 USERBEND:   .EQU    6           ; "B" register end
+NUMUSERVARS:.EQU    4           ; Total number of user variables.
 
 
 
@@ -603,7 +604,7 @@ STDCALL:    DI
 ;   T-1: RAM address to return to after the call (OPON in AltLCD)
 ;   T-2: Option ROM address to return to after the call through OPON
 ;
-; That stack is obviously clear of all of those items on return from STDCALL.
+; That stack is obviously clear of all of those items on return from INTCALL.
 
 
 INTCALL:    SHLD    INTH        ; Preserve HL
@@ -644,7 +645,7 @@ INTCALL:    SHLD    INTH        ; Preserve HL
 ; We disable interrupts, copy OPON into high memory, call LNKFIL to ensure
 ; that all of the cached file start addresses are accurate, set up our memory
 ; map (by figuring out where free space starts and ends), initialize the
-; retur stack, and JMP to the MFORTH COLD word.
+; return stack, and JMP to the MFORTH COLD word.
 
 INIT:       DI
 
@@ -678,7 +679,7 @@ _init1:     LDAX    D           ; Load value from [DE]
             SHLD    TICKLATEST
             
             ; Four USER variables are currently in use (SavedSP, Base, B, Bend).
-            LXI     H,4
+            LXI     H,NUMUSERVARS
             SHLD    TICKNUMUSERVARS
             
             ; Create the first task, which needs to be in place for us
