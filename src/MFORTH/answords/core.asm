@@ -564,12 +564,12 @@ TWOSWAP:    SAVEDE
 ;       represent arguments to and results from name, respectively.
 
 ; : : ( "<spaces>name" -- )
-;   CREATE HIDE ]  CFASIZE NEGATE ALLOT  195 C, DOCOLON , ; -- JMP DOCOLON
+;   CREATE HIDE ]  CFASZ NEGATE ALLOT  195 C, DOCOLON , ; -- JMP DOCOLON
 
             LINKTO(TWOSWAP,0,1,03Ah,"")
 COLON:      JMP     ENTER
             .WORD   CREATE,HIDE,RTBRACKET
-            .WORD   LIT,-CFASIZE,ALLOT,LIT,195,CCOMMA,LIT,DOCOLON,COMMA
+            .WORD   LIT,-CFASZ,ALLOT,LIT,195,CCOMMA,LIT,DOCOLON,COMMA
             .WORD   EXIT
 
 
@@ -688,11 +688,11 @@ _gtDONE:    PUSH    H           ; Push the flag to the stack.
 ; a-addr is the data-field address corresponding to xt.  An ambiguous
 ; condition exists if xt is not for a word defined via CREATE.
 ;
-; : >BODY ( xt -- a-addr)   CFASIZE + ;
+; : >BODY ( xt -- a-addr)   CFASZ + ;
 
             LINKTO(GREATERTHAN,0,5,'Y',"DOB>")
 TOBODY:     JMP     ENTER
-            .WORD   LIT,CFASIZE,PLUS,EXIT
+            .WORD   LIT,CFASZ,PLUS,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -1097,11 +1097,11 @@ CHARS:      NEXT                ; No-op in MFORTH, because chars are 1 byte.
 ;   Place x on the stack.
 ;
 ; : CONSTANT ( x "<spaces>name" -- )
-;   CREATE  CFASIZE NEGATE ALLOT  195 C, DOCONSTANT ,  , ; -- JMP DOCONSTANT
+;   CREATE  CFASZ NEGATE ALLOT  195 C, DOCONSTANT ,  , ; -- JMP DOCONSTANT
 
             LINKTO(CHARS,0,8,'T',"NATSNOC")
 CONSTANT:   JMP     ENTER
-            .WORD   CREATE,LIT,-CFASIZE,ALLOT,LIT,195,CCOMMA,LIT,DOCONSTANT,COMMA
+            .WORD   CREATE,LIT,-CFASZ,ALLOT,LIT,195,CCOMMA,LIT,DOCONSTANT,COMMA
             .WORD   COMMA,EXIT
 
 
@@ -1153,7 +1153,7 @@ CR:         CALL    STDCALL     ; Call the
 ;   COUNT 2>B  B# 1+ ALLOT  HERE 1-  B# OVER C!
 ;   FORB 1- B@ OVER C! NEXTB  DUP C@ 128 OR SWAP C!
 ;   LATEST @ ,  [ PROFILER ] [IF] 0 , [THEN]
-;   HERE HEADERSIZE - LATEST !  195 C, DOCREATE , -- JMP DOCREATE
+;   HERE NFATOCFASZ - LATEST !  195 C, DOCREATE , -- JMP DOCREATE
 ;
 
             LINKTO(CR,0,6,'E',"TAERC")
@@ -1168,7 +1168,7 @@ _create3:   .WORD   DUP,CFETCH,LIT,128,OR,SWAP,CSTORE
 #IFDEF PROFILER
             .WORD   ZERO,COMMA
 #ENDIF
-            .WORD   HERE,LIT,HEADERSIZE,MINUS,LATEST,STORE
+            .WORD   HERE,LIT,NFATOCFASZ,MINUS,LATEST,STORE
             .WORD       LIT,195,CCOMMA,LIT,DOCREATE,COMMA
             .WORD   EXIT
 
@@ -2448,11 +2448,11 @@ UNTIL:      JMP     ENTER
 ;   for initializing the contents of the reserved cell.
 
 ; : VARIABLE ( "<spaces>name" -- )
-;   CREATE  HEADERSIZE NEGATE ALLOT  195 C, DOVARIABLE ,  0 , ; -- JMP DOVARIABLE
+;   CREATE  NFATOCFASZ NEGATE ALLOT  195 C, DOVARIABLE ,  0 , ; -- JMP DOVARIABLE
 
             LINKTO(UNTIL,0,8,'E',"LBAIRAV")
 VARIABLE:   JMP     ENTER
-            .WORD   CREATE,LIT,-HEADERSIZE,ALLOT,LIT,195,CCOMMA,LIT,DOVARIABLE,COMMA
+            .WORD   CREATE,LIT,-NFATOCFASZ,ALLOT,LIT,195,CCOMMA,LIT,DOVARIABLE,COMMA
             .WORD   ZERO,COMMA,EXIT
 
 
@@ -3152,11 +3152,11 @@ LIT:        LHLX            ; Read constant from instruction stream.
 ; cfa-addr is the Code Field Address for the word whose Name Field Address
 ; is nfa-addr.
 ;
-; : NFA>CFA ( nfa-addr -- cfa-addr)   HEADERSIZE + ;
+; : NFA>CFA ( nfa-addr -- cfa-addr)   NFATOCFASZ + ;
 
             LINKTO(LIT,0,7,'A',"FC>AFN")
 NFATOCFA:   POP     H
-            SKIPHEADER
+            INXNFATOCFA(H)
             PUSH    H
             NEXT
 

@@ -36,14 +36,6 @@ MFORTH_MINOR    .EQU    9
 
 
 ; ======================================================================
-; MFORTH Configuration Flags
-; ======================================================================
-
-#DEFINE         PROFILER
-
-
-
-; ======================================================================
 ; MFORTH Register Usage
 ; ======================================================================
 ;
@@ -119,7 +111,7 @@ MFORTH_MINOR    .EQU    9
 ;   +--------------------------------+
 ;
 ;
-; Task Page (at xx00h in high memory)
+; Task Page (at xx00h in high memory):
 ;
 ;   +--------------------------------+  xx00h
 ;   |         User Variables         |
@@ -132,6 +124,50 @@ MFORTH_MINOR    .EQU    9
 ;   |              ^^^^              |
 ;   |        Parameter Stack         |
 ;   +--------------------------------+  xxFFh
+;
+;
+; Dictionary Header:
+;
+;   The MFORTH dictionary uses the layout described by Robert L. Smith
+;   in his Forth Dimensions I/5 article titled "A Modest Proposal for
+;   Dictionary Headers".
+;
+;   The 00h byte is called the Name Field Address in MFORTH, even though
+;   it only points to the name count and flags.  The Link Field Address
+;   points to the Name Field Address of the preceding definition.
+;
+;   The Profiler Execution Count (the dotted cell at 03h) is only used
+;   when the profiler is enabled at build time.  That cell is not used,
+;   nor is it even allocated (the fixed size of the dictionary header is
+;   only three bytes, in other words) when the profiler is disabled.  The
+;   Profiler Execution Count stores the number of times that the word
+;   was executed by NEXT when the PROFILING variable is non-zero.
+;
+;   The header below is for the word DUP; note that the word name is
+;   stored in reverse order in memory.
+;
+;   +--------------------------------+ -03h
+;   | 1 |          'P'               |
+;   +--------------------------------+ -02h
+;   | 0 |          'U'               |
+;   +--------------------------------+ -01h
+;   | 0 |          'D'               |
+;   +--------------------------------+  00h
+;   | P | S |     Count              |
+;   +--------------------------------+  01h
+;   |             Link               |
+;   |             Field              |
+;   +--------------------------------+  03h
+;   .            Profiler            .
+;   .        Execution Count         .
+;   +--------------------------------+  03h/05h
+;   |             Code               |
+;   |             Field              |
+;   |          (JMP $xxxx)           |
+;   +--------------------------------+  06h/08h
+;   .           Parameter            .
+;   .             Field              .
+;   . . . . . . . .  . . . . . . . . .
 
 
 
@@ -169,20 +205,30 @@ STACKGUARD: .EQU    076h        ; The guard value used to see if a Task
 
 
 ; ======================================================================
-; MFORTH Constants
+; MFORTH Dictionary Constants
 ; ======================================================================
 
+NFASZ:      .EQU    1           ; Size of the Name Field.
+LFASZ:      .EQU    2           ; Size of the Link Field.
+
 #IFNDEF PROFILER
-HEADERSIZE: .EQU    1+2         ; Name Length + Link Field
-#DEFINE     SKIPHEADER  INX H\ INX H\ INX H
+NFATOCFASZ: .EQU    NFASZ+LFASZ
+#DEFINE     INXNFATOCFA(r) INX r\ INX r\ INX r
 #ELSE
-HEADERSIZE: .EQU    1+2+2       ; Name Length + Link Field + Execution Count
-PROFOFFSET: .EQU    1+2         ; Offset from NFA to Execution Count
-#DEFINE     SKIPHEADER  INX H\ INX H\ INX H\ INX H\ INX H
+NFATOPECSZ: .EQU    NFASZ+LFASZ
+PECSZ:      .EQU    2           ; Size of the Profiler Execution Count.
+NFATOCFASZ: .EQU    NFASZ+LFASZ+PECSZ
+#DEFINE     INXNFATOCFA(r) INX r\ INX r\ INX r\ INX r\ INX r
 #ENDIF
 
-CFASIZE:    .EQU    3           ; Size of the Code Field.
-#DEFINE     SKIPCFA INX H\ INX H\ INX H
+CFASZ:      .EQU    3           ; Size of the Code Field.
+#DEFINE     INXCFATOPFA(r) INX r\ INX r\ INX r
+
+
+
+; ======================================================================
+; MFORTH Constants
+; ======================================================================
 
 TIBSIZE:    .EQU    80          ; Length of the Terminal Input Buffer.
 
@@ -604,7 +650,7 @@ _init1:     LDAX    D           ; Load value from [DE]
             SHLD    BOPSTK      ; ..and store it in in BOPSTK.
             
             ; Initialize LATEST.
-            LXI     H,_latest-HEADERSIZE
+            LXI     H,_latest-NFATOCFASZ
             SHLD    TICKLATEST
             
             ; Four USER variables are currently in use (SavedSP, Base, B, Bend).
@@ -663,7 +709,7 @@ _init1:     LDAX    D           ; Load value from [DE]
 #include "kernel.asm"
 
 ; ANS word sets.
-LINK_CORE       .EQU    HEADERSIZE
+LINK_CORE       .EQU    NFATOCFASZ
 #include "answords/core.asm"
 
 LINK_COREEXT    .EQU    LAST_CORE

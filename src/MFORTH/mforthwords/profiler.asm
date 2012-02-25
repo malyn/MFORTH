@@ -37,13 +37,13 @@
 ;
 ; ---
 ; : PRINT-PROFILE ( -- )
-;   PRN  LATEST @  BEGIN  DUP PROFOFFSET + @  ?DUP IF U. DUP .NAME CR THEN
+;   PRN  LATEST @  BEGIN  DUP NFATOPECSZ + @  ?DUP IF U. DUP .NAME CR THEN
 ;   NFA>LFA @  DUP 0= UNTIL DROP  [HEX] 0C EMIT  LCD ;
 
             LINKTO(LINK_PROFILER,0,13,'E',"LIFORP-TNIRP")
 PRINTPROFILE:JMP    ENTER
             .WORD   PRN,LATEST,FETCH
-_printprof1:.WORD   DUP,LIT,PROFOFFSET,PLUS,FETCH,QDUP,zbranch,_printprof2
+_printprof1:.WORD   DUP,LIT,NFATOPECSZ,PLUS,FETCH,QDUP,zbranch,_printprof2
             .WORD   UDOT,DUP,DOTNAME,CR
 _printprof2:.WORD   NFATOLFA,FETCH,DUP,ZEROEQUALS,zbranch,_printprof1
             .WORD   DROP,LIT,0Ch,EMIT,LCD,EXIT
@@ -58,7 +58,7 @@ _printprof2:.WORD   NFATOLFA,FETCH,DUP,ZEROEQUALS,zbranch,_printprof1
 ; : PROFILE ( xt -- )
 ;   CLEAR-PROFILER
 ;   1 PROFILING !  0 PROFILETICKS !  EXECUTE  PROFILETICKS @  0 PROFILING !
-;   CR ." Total time:" 2* 2* U. ." us" ;
+;   CR ." Total time:" 2* 2* U. ." ms" ;
 
             LINKTO(PRINTPROFILE,0,7,'E',"LIFORP")
 PROFILE:    JMP     ENTER
@@ -68,7 +68,7 @@ PROFILE:    JMP     ENTER
             .WORD   CR,PSQUOTE,12
             .BYTE   "Total time: "
             .WORD   TYPE,TWOSTAR,TWOSTAR,UDOT,PSQUOTE,2
-            .BYTE   "us"
+            .BYTE   "ms"
             .WORD   TYPE,EXIT
 
 
@@ -84,12 +84,12 @@ PROFILE:    JMP     ENTER
 ;
 ; ---
 ; : CLEAR-PROFILE ( -- )
-;   LATEST @  BEGIN  0 OVER PROFOFFSET + !  NFA>LFA @  DUP 0= UNTIL DROP ;
+;   LATEST @  BEGIN  0 OVER NFATOPECSZ + !  NFA>LFA @  DUP 0= UNTIL DROP ;
 
             LINKTO(PROFILE,0,13,'E',"LIFORP-RAELC")
 LAST_PROFILER:
 CLEARPROFILE:JMP    ENTER
             .WORD   LATEST,FETCH
-_clearprof1:.WORD   ZERO,OVER,LIT,PROFOFFSET,PLUS,STORE
+_clearprof1:.WORD   ZERO,OVER,LIT,NFATOPECSZ,PLUS,STORE
             .WORD   NFATOLFA,FETCH,DUP,ZEROEQUALS,zbranch,_clearprof1
             .WORD   DROP,EXIT

@@ -125,7 +125,7 @@ _profnext1: LHLX                ; (IP) -> W
 
 DOCOLON:
 ENTER:      RSPUSH(D,E)         ;[6.34]
-            LDEH    CFASIZE     ;[2.10] W+CFASIZE -> IP
+            LDEH CFASZ          ;[2.10] W+CFASZ -> IP
             NEXT                ;[4.25]
                                 ;[12.69]
 
@@ -133,7 +133,7 @@ ENTER:      RSPUSH(D,E)         ;[6.34]
 ; ----------------------------------------------------------------------
 ; DODOES for use by high-level CREATE..DOES> definitions
 
-DODOES:     SKIPCFA             ; Skip over the CFA so that HL points to PFA.
+DODOES:     INXCFATOPFA(H)      ; Skip over the CFA so that HL points to PFA.
             XTHL                ; Swap PFA with the address of the high-level
                                 ; ..word that appears after DOES>.  That addr
                                 ; ..is on the stack because we CALL DODOES.
@@ -146,7 +146,7 @@ DODOES:     SKIPCFA             ; Skip over the CFA so that HL points to PFA.
 ; DOCREATE and DOVARIABLE for use by high-level CREATE and VARIABLE definitions.
 
 DOCREATE:
-DOVARIABLE: SKIPCFA             ; Skip over the CFA so that HL points to PFA.
+DOVARIABLE: INXCFATOPFA(H)      ; Skip over the CFA so that HL points to PFA.
             PUSH    H           ; Push PFA to the stack.
             NEXT
 
@@ -154,7 +154,7 @@ DOVARIABLE: SKIPCFA             ; Skip over the CFA so that HL points to PFA.
 ; ----------------------------------------------------------------------
 ; DOCONSTANT for use by high-level CONSTANT definitions.
 
-DOCONSTANT: SKIPCFA             ; Skip over the CFA so that HL points to PFA.
+DOCONSTANT: INXCFATOPFA(H)      ; Skip over the CFA so that HL points to PFA.
             MOV     A,M         ; Get the low byte of the constant in A,
             INX     H           ; ..then increment to the high byte,
             MOV     H,M         ; ..get the high byte into H,
@@ -166,7 +166,7 @@ DOCONSTANT: SKIPCFA             ; Skip over the CFA so that HL points to PFA.
 ; ----------------------------------------------------------------------
 ; DOUSER for use by high-level USER variables.
 
-DOUSER:     SKIPCFA             ; Skip over the CFA so that HL points to PFA.
+DOUSER:     INXCFATOPFA(H)      ; Skip over the CFA so that HL points to PFA.
             MOV     L,M         ; Put USER variable offset into L.
             MOV     H,B         ; Put Task Page into H.
             PUSH    H           ; Push USER variable address onto stack.
@@ -181,10 +181,6 @@ DOUSER:     SKIPCFA             ; Skip over the CFA so that HL points to PFA.
 ; ----------------------------------------------------------------------
 ; Dictionary-linking macro
 ;
-; The MFORTH dictionary uses the layout described by Robert L. Smith in
-; his Forth Dimensions I/5 article titled "A Modest Proposal for Dictionary
-; Headers".
-;
 ; LINKTO is used like so (for a word named "FOUND?" that links to FIND):
 ;
 ;   LINKTO(FIND,0,6,'?',"DNUOF")
@@ -193,7 +189,7 @@ DOUSER:     SKIPCFA             ; Skip over the CFA so that HL points to PFA.
 ; specified as a separate byte.
 
 #IFNDEF PROFILER
-#DEFINE     LINKTO(prev,isimm,len,lastchar,revchars) .BYTE 10000000b|lastchar,revchars\ .BYTE (isimm<<7)|len\ .WORD prev-HEADERSIZE
+#DEFINE     LINKTO(prev,isimm,len,lastchar,revchars) .BYTE 10000000b|lastchar,revchars\ .BYTE (isimm<<7)|len\ .WORD prev-NFATOCFASZ
 #ELSE
-#DEFINE     LINKTO(prev,isimm,len,lastchar,revchars) .BYTE 10000000b|lastchar,revchars\ .BYTE (isimm<<7)|len\ .WORD prev-HEADERSIZE\ .WORD 0
+#DEFINE     LINKTO(prev,isimm,len,lastchar,revchars) .BYTE 10000000b|lastchar,revchars\ .BYTE (isimm<<7)|len\ .WORD prev-NFATOCFASZ\ .WORD 0
 #ENDIF
