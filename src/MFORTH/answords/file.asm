@@ -167,6 +167,36 @@ _filesize1: .WORD   DUP,LIT,FCBEND,PLUS,FETCH,SWAP,LIT,FCBADDR,PLUS,FETCH
 ; exception reading fileid, or if an I/O exception occurs while closing
 ; fileid.  When an ambiguous condition exists, the status (open or closed)
 ; of any files that were being interpreted is implementation-defined.
+;
+; ---
+; \ TODO: Store zero in BLK.
+; \ TODO? Use SOURCE-ID (FILEID>FCB) instead of storing FCB on the return
+; \       stack (INCLUDE nesting could use up a lot of the return stack).
+; \ TODO? Have NEXT-LINE return addresses instead of lengths so that we
+; \       don't have to do addition here.
+; : INCLUDE-FILE  ( i*x fileid -- j*x)
+;   DUP FILEID>FCB? ABORT" Invalid fileid"  >R
+;   PUSHICB  ICB ICBSOURCEID + !
+;   BEGIN  R@ 2@ -  WHILE
+;       R@ NEXT-LINE ( len len+CRLF R:fcb)
+;       R@ @ ( len len+CRLF pos R:fcb) ROT OVER + ( len+CRLF pos end) ICB 2!
+;       R@ +!
+;       INTERPRET
+;   REPEAT
+;   R> FCB>FILEID CLOSE-FILE DROP  POPICB ;
+
+            LINKTO(FILESIZE,0,12,'E',"LIF-EDULCNI")
+INCLUDEFILE:JMP     ENTER
+            .WORD   DUP,FILEIDTOFCBQ,zbranch,_includefile1
+            .WORD   PSQUOTE,14
+            .BYTE   "Invalid fileid"
+            .WORD   TYPE,ABORT
+_includefile1:.WORD TOR,PUSHICB,ICB,LIT,ICBSOURCEID,PLUS,STORE
+_includefile2:.WORD RFETCH,TWOFETCH,MINUS,zbranch,_includefile3
+            .WORD   RFETCH,NEXTLINE,RFETCH,FETCH,ROT,OVER,PLUS,ICB,TWOSTORE
+            .WORD   RFETCH,PLUSSTORE,INTERPRET,branch,_includefile2
+_includefile3:.WORD RFROM,FCBTOFILEID,CLOSEFILE,DROP,POPICB,EXIT
+
 
 
 ; ----------------------------------------------------------------------
@@ -191,6 +221,18 @@ _filesize1: .WORD   DUP,LIT,FCBEND,PLUS,FETCH,SWAP,LIT,FCBADDR,PLUS,FETCH
 ; exception occurs reading the file, or if an I/O exception occurs while
 ; closing the file.  When an ambiguous condition exists, the status (open or
 ; closed) of any files that were being interpreted is implementation-defined.
+;
+; ---
+; : INCLUDED ( i*x c-addr u -- j*x)
+;   R/O OPEN-FILE ABORT" Unknown file" INCLUDE-FILE ;
+
+            LINKTO(INCLUDEFILE,0,8,'D',"EDULCNI")
+INCLUDED:   JMP     ENTER
+            .WORD   RO,OPENFILE,zbranch,_included1
+            .WORD   PSQUOTE,12
+            .BYTE   "Unknown file"
+            .WORD   TYPE,ABORT
+_included1: .WORD   INCLUDEFILE,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -214,7 +256,7 @@ _filesize1: .WORD   DUP,LIT,FCBEND,PLUS,FETCH,SWAP,LIT,FCBADDR,PLUS,FETCH
 ;   R@ FCBGENNUM + DUP C@ 1+ SWAP C!
 ;   R> FCB>FILEID IOROK ;
 
-            LINKTO(FILESIZE,0,9,'E',"LIF-NEPO")
+            LINKTO(INCLUDED,0,9,'E',"LIF-NEPO")
 OPENFILE:   JMP     ENTER
             .WORD   RO,NOTEQUALS,zbranch,_openfile1
             .WORD   TWODROP,ZERO,LIT,IORRDONLY,EXIT
@@ -280,20 +322,17 @@ RW:         JMP     ENTER
 ; ---
 ; \ u1 bytes are copied first, then u2 is determined later.  We might "read"
 ; \ more bytes than are remaining, but that's not an issue for us given that
-; \ all of our files are in memory anyway.  COPY is like MOVE, but it returns
-; \ the number of bytes copied.  This becomes important later for READ-LINE,
-; \ which uses COPY-LINE.  COPY-LINE will copy up to the given number of bytes
-; \ or until a CRLF or EOF is read, whichever happens first.  That's why we are
-; \ using COPY here instead of the equivalent DUP >R MOVE R> sequence.
+; \ all of our files are in memory anyway.
 ; : READ-FILE ( c-addr u1 fileid -- u2 ior)
 ;   FILEID>FCB? ?DUP IF NIP NIP 0 SWAP EXIT THEN  ( ca u1 fcb)
-;   DUP >R @ ( ca u1 pos R:fcb) -ROT COPY ( u1 R:fcb)
+;   DUP >R @ ( ca u1 pos R:fcb) -ROT DUP >R MOVE R> ( u1 R:fcb)
 ;   R@ 2@ - ( u1 rem R:fcb) MIN  DUP R> ( cnt cnt fcb) +!  IOROK ;
 
             LINKTO(RW,0,9,'E',"LIF-DAER")
 READFILE:    JMP    ENTER
             .WORD   FILEIDTOFCBQ,QDUP,zbranch,_readfile1,NIP,NIP,ZERO,SWAP,EXIT
-_readfile1: .WORD   DUP,TOR,FETCH,DASHROT,COPY,RFETCH,TWOFETCH,MINUS,MIN
+_readfile1: .WORD   DUP,TOR,FETCH,DASHROT,DUP,TOR,MOVE,RFROM
+            .WORD   RFETCH,TWOFETCH,MINUS,MIN
             .WORD   DUP,RFROM,PLUSSTORE,LIT,IOROK,EXIT
 
 
@@ -352,11 +391,11 @@ _readline2: .WORD   DUP,TOR,FETCH,DASHROT,COPYLINE
 ;
 ; ---
 ; : REPOSITION-FILE ( ud fileid -- ior)
-;   FILEID>FCB? IF EXIT THEN  DUP  FCBADDR + @ ROT +  SWAP !  IOROK ;
+;   FILEID>FCB? ?DUP IF DROP EXIT THEN  DUP  FCBADDR + @ ROT +  SWAP !  IOROK ;
 
             LINKTO(READLINE,0,15,'E',"LIF-NOITISOPER")
 REPOSFILE:   JMP    ENTER
-            .WORD   FILEIDTOFCBQ,zbranch,_reposfile,EXIT
+            .WORD   FILEIDTOFCBQ,QDUP,zbranch,_reposfile,DROP,EXIT
 _reposfile: .WORD   DUP,LIT,FCBADDR,PLUS,FETCH,ROT,PLUS,SWAP,STORE
             .WORD   LIT,IOROK,EXIT
 
@@ -487,8 +526,8 @@ FCBTOFILEID:JMP     ENTER
 ; ior if the fileid is invalid.
 ;
 ; : FILEID>FCB? ( fileid -- ior | fcb-addr 0 )
-;   DUP 8 RSHIFT  SWAP 255 AND
-;   DUP 0=  OVER MAXFCBS >  OR IF 2DROP IORBADFILEID EXIT THEN
+;   DUP 8 RSHIFT  SWAP 255 AND ( gen fcboff)
+;   DUP 0=  OVER [ MAXFCBS 2* 2* 2* ] >  OR IF 2DROP IORBADFILEID EXIT THEN
 ;   1- FCBSTART +  DUP FCBGENNUM + C@ ROT <> IF DROP IORBADFILEID EXIT THEN
 ;   DUP FCBADDR + @ 0= IF DROP IORBADFILEID EXIT THEN
 ;   IOROK ;
@@ -496,7 +535,7 @@ FCBTOFILEID:JMP     ENTER
             LINKTO(FCBTOFILEID,0,11,'?',"BCF>DIELIF")
 FILEIDTOFCBQ:JMP    ENTER
             .WORD   DUP,LIT,8,RSHIFT,SWAP,LIT,255,AND
-            .WORD   DUP,ZEROEQUALS,OVER,LIT,MAXFCBS,GREATERTHAN
+            .WORD   DUP,ZEROEQUALS,OVER,LIT,MAXFCBS*8,GREATERTHAN
             .WORD       OR,zbranch,_fileidtofcbq1
             .WORD   TWODROP,LIT,IORBADFILEID,EXIT
 _fileidtofcbq1:.WORD ONEMINUS,LIT,FCBSTART,PLUS,DUP,LIT,FCBGENNUM,PLUS
@@ -517,7 +556,8 @@ _fileidtofcbq3:.WORD LIT,IOROK,EXIT
 ;
 ; : FIND-FILE ( ca u -- ior | fa fl 0)
 ;   DUP 6 > IF 2DROP IORFNF EXIT THEN
-;   TUCK  FILNAME SWAP MOVE  6 SWAP ?DO BL OVER C! 1+ LOOP
+;   TUCK  FILNAME SWAP MOVE
+;   6 SWAP ( 6 u) ?DO BL FILNAME I + C! LOOP
 ;   FILNAME 6 +  [CHAR] D OVER C!  [CHAR] O SWAP 1+ C!
 ;   SRCNAM ;
 
@@ -527,7 +567,7 @@ FINDFILE:   JMP     ENTER
             .WORD   TWODROP,LIT,IORFNF,EXIT
 _findfile1: .WORD   TUCK,LIT,0FC93h,SWAP,MOVE
             .WORD   LIT,6,SWAP,pqdo,_findfile3
-_findfile2: .WORD   BL,OVER,CSTORE,ONEPLUS,ploop,_findfile2
+_findfile2: .WORD   BL,LIT,0FC93h,I,PLUS,CSTORE,ploop,_findfile2
 _findfile3: .WORD   LIT,0FC93h,LIT,6,PLUS
             .WORD   LIT,'D',OVER,CSTORE,LIT,'O',SWAP,ONEPLUS,CSTORE
             .WORD   SRCNAM,EXIT
@@ -568,12 +608,40 @@ _newfcb2:   .WORD   DROP,LIT,8,pplusloop,_newfcb1
 
 
 ; ----------------------------------------------------------------------
+; NEXT-LINE [MFORTH] ( fcb -- u1 u2 )
+;
+; Read forward from the current position in the file identified by fcb
+; until either a CRLF sequence is found or the end of file is reached.
+; u1 is the number of bytes in the current line of the file (ignoring the
+; CRLF sequence, if any).  u2 is the number of bytes actually read, which
+; will normally be u1+2 if the line was terminated with a CRLF.
+;
+; ---
+; \ The loop in this method takes advantage of the fact that all M100 files
+; \ end with an EOF and so we can always read the next two characters in the
+; \ file, even if this is the last character in the file.  We will never read
+; \ a byte from another file in this situation, because the second character
+; \ will be EOF.
+; : NEXT-LINE ( fcb -- u1 u2)
+;   2@ TUCK - 2>B 0 FORB B @ 0x0A0D = IF DUP 1+ 1+ EXIT THEN 1+ NEXTB DUP ;
+
+            LINKTO(NEWFCB,0,9,'E',"NIL-TXEN")
+NEXTLINE:   JMP     ENTER
+            .WORD   TWOFETCH,TUCK,MINUS,TWOTOB,ZERO
+_nextline1: .WORD   BQUES,zbranch,_nextline3
+            .WORD   B,FETCH,LIT,0A0Dh,EQUALS,zbranch,_nextline2
+            .WORD   DUP,ONEPLUS,ONEPLUS,EXIT
+_nextline2: .WORD   ONEPLUS,BPLUS,branch,_nextline1
+_nextline3: .WORD   DUP,EXIT
+
+
+; ----------------------------------------------------------------------
 ; SRCNAM [MFORTH] ( -- ior | file-addr file-len 0 )
 ;
 ; Call the Main ROM's SRCNAM routine.  FILNAM has already been populated
 ; by the caller.
 
-            LINKTO(NEWFCB,0,6,'M',"ANCRS")
+            LINKTO(NEXTLINE,0,6,'M',"ANCRS")
 LAST_FILE:
 SRCNAM:     SAVEDE              ; Save DE
             PUSH    B           ; ..and BC, both of which are corrupted.

@@ -110,22 +110,6 @@ COLD:       JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
-; COPY [MFORTH] ( addr1 addr2 u -- u )
-;
-; If u is greater than zero, copy the contents of u consecutive address
-; units at addr1 to the u consecutive address units at addr2.  After COPY
-; completes, the u consecutive address units at addr2 contain exactly what
-; the u consecutive address units at addr1 contained before the move.  u
-; is the number of address units that were copied.
-;
-; : COPY ( addr1 addr2 u -- u)   DUP >R MOVE R> ;
-
-            LINKTO(COLD,0,4,'Y',"POC")
-COPY:       JMP     ENTER
-            .WORD   DUP,TOR,MOVE,RFROM,EXIT
-
-
-; ----------------------------------------------------------------------
 ; COPY-LINE [MFORTH] ( addr1 addr2 u1 -- u2 u3 )
 ;
 ; If u1 is greater than zero, copy the contents of u1 consecutive address
@@ -147,7 +131,7 @@ COPY:       JMP     ENTER
 ;   B@ OVER C! 1+ NEXTB
 ;   SWAP - DUP ;
 
-            LINKTO(COPY,0,8,'E',"NIL-YPOC")
+            LINKTO(COLD,0,9,'E',"NIL-YPOC")
 COPYLINE:   JMP     ENTER
             .WORD   ROT,SWAP,TWOTOB,DUP
 _copyline1: .WORD   BQUES,zbranch,_copyline3

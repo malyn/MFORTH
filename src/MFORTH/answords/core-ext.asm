@@ -197,8 +197,9 @@ PICK:       POP     H           ; Get u into HL,
 ;   =================================
 ;   SOURCE-ID	Input source
 ;   ---------------------------------
-;       -1      String (via EVALUATE)
-;        0      User input device
+;    fileid     Text file "fileid"
+;      -1       String (via EVALUATE)
+;       0       User input device
 ;   =================================
 ;
 ; ---

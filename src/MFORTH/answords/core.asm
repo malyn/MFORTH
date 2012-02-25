@@ -2623,7 +2623,7 @@ RTBRACKET:  LXI     H,0FFFFh
 ; Stores information about an input source.
 
 ICBLINEEND: .EQU    0           ; Offset to end of line.
-ICBLINESTART:.EQU   2           ; Offset from FCB to start of line cell.
+ICBLINESTART:.EQU   2           ; Offset from ICB to start of line cell.
 ICBSOURCEID:.EQU    4           ; Offset to SOURCE-ID for this source.
 ICBTOIN:    .EQU    6           ; Offset to >IN value.
 
