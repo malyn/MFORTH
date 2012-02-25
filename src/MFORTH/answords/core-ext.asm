@@ -47,11 +47,30 @@ _zneqDONE:  PUSH    H           ; Push the flag to the stack.
 
 
 ; ----------------------------------------------------------------------
+; 2R> [CORE EXT] 6.2.0410 "two-r-from"
+;
+; Interpretation:
+;   Interpretation semantics for this word are undefined.
+;
+; Execution: ( -- x1 x2 ) ( R: x1 x2 -- )
+;   Transfer cell pair x1 x2 from the return stack.  Semantically equivalent
+;   to R> R> SWAP.
+
+            LINKTO(ZERONOTEQUALS,0,3,'>',"R2")
+TWORFROM:   RSPOP(H,L)          ; Pop x2 from the return stack
+            PUSH    H           ; ..and push it to the stack (which is wrong).
+            RSPOP(H,L)          ; Pop x1 from the return stack,
+            XTHL                ; ..then swap x2 and x1 to fix things up,
+            PUSH    H           ; ..and finally push x2 back onto the stack.
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; <> [CORE EXT] 6.2.0500 "not-equals" ( x1 x2 -- flag )
 ;
 ; flag is true if and only if x1 is not bit-for-bit the same as x2.
 
-            LINKTO(ZERONOTEQUALS,0,2,'>',"<")
+            LINKTO(TWORFROM,0,2,'>',"<")
 NOTEQUALS:  SAVEDE
             POP     H           ; Pop x2.
             POP     D           ; Pop x1.

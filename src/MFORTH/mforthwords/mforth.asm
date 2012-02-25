@@ -30,6 +30,22 @@
 ; ======================================================================
 
 ; ----------------------------------------------------------------------
+; -ROT [MFORTH] "dash-rote" ( x1 x2 x3 -- x3 x1 x2 )
+;
+; Reverse-rotate the top three stack entries.
+
+            LINKTO(LINK_MFORTH,0,4,'T',"OR-")
+DASHROT:    SAVEDE
+            POP     H           ; Pop x3 into HL.
+            POP     D           ; Pop x2 into DE.
+            XTHL                ; Swap TOS (x1) with HL (x3).
+            PUSH    H           ; Push x1 back onto the stack.
+            PUSH    D           ; Push x2 back onto the stack.
+            RESTOREDE
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; .VER [MFORTH] "dot-ver" ( -- )
 ;
 ; Display the MFORTH version as a string of 15 characters ("MFORTH 1.0.0000").
@@ -40,7 +56,7 @@
 ;   MFORTH_MINOR [CHAR] 0 + EMIT  [CHAR] . EMIT
 ;   BASE @  HEX  MFORTH_CHANGE 0 <# # # # # #> TYPE  BASE ! ;
 
-            LINKTO(LINK_MFORTH,0,4,'R',"EV.")
+            LINKTO(DASHROT,0,4,'R',"EV.")
 DOTVER:     JMP     ENTER
             .WORD   PSQUOTE,7
             .BYTE   "MFORTH "
@@ -94,11 +110,27 @@ COLD:       JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
+; COPY [MFORTH] ( addr1 addr2 u -- u )
+;
+; If u is greater than zero, copy the contents of u consecutive address
+; units at addr1 to the u consecutive address units at addr2.  After COPY
+; completes, the u consecutive address units at addr2 contain exactly what
+; the u consecutive address units at addr1 contained before the move.  u
+; is the number of address units that were copied.
+;
+; : COPY ( addr1 addr2 u -- u)   DUP >R MOVE R> ;
+
+            LINKTO(COLD,0,4,'Y',"POC")
+COPY:       JMP     ENTER
+            .WORD   DUP,TOR,MOVE,RFROM,EXIT
+
+
+; ----------------------------------------------------------------------
 ; HALT [MFORTH] ( -- )
 ;
 ; Halt the processor.
 
-            LINKTO(COLD,0,4,'T',"LAH")
+            LINKTO(COPY,0,4,'T',"LAH")
 HALT:       HLT                 ; Halt the processor.
             NEXT
 
