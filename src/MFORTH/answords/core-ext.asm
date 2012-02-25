@@ -30,11 +30,29 @@
 ; ======================================================================
 
 ; ----------------------------------------------------------------------
+; .( [CORE EXT] 6.2.0200 "dot-paren"
+;
+; Compilation:
+;   Perform the execution semantics given below.
+;
+; Execution: ( "ccc<paren>" -- )
+;   Parse and display ccc delimited by ) (right parenthesis).  .( is an
+;   immediate word.
+;
+; ---
+; : .( "ccc<paren>" --)   [CHAR] ) PARSE TYPE ; IMMEDIATE
+
+            LINKTO(LINK_COREEXT,1,2,028h,".")
+DOTPAREN:   JMP     ENTER
+            .WORD   LIT,')',PARSE,TYPE,EXIT
+
+
+; ----------------------------------------------------------------------
 ; 0<> [CORE EXT] 6.2.0260 "zero-not-equals" ( x -- flag )
 ;
 ; flag is true if and only if x is not equal to zero.
 
-            LINKTO(LINK_COREEXT,0,3,'>',"<0")
+            LINKTO(DOTPAREN,0,3,'>',"<0")
 ZERONOTEQUALS:POP   H           ; Pop the value.
             MOV     A,H         ; See if the flag is zero by moving H to A
             ORA     L           ; ..and then ORing A with L.
@@ -141,12 +159,12 @@ AGAIN:      JMP     ENTER
 ;   A program shall not alter the returned string.
 ;
 ; : C" ( "ccc<quote>" --)   ['] (C") COMPILE,
-;   [CHAR] " WORD  DUP C@ 1+  HERE ( ca size dp) OVER ALLOT SWAP MOVE ;
+;   [CHAR] " PARSE  DUP C,  HERE OVER ALLOT SWAP CMOVE ;
 
             LINKTO(AGAIN,1,2,022h,"C")
 CQUOTE:     JMP     ENTER
-            .WORD   LIT,PCQUOTE,COMPILECOMMA,LIT,022h,WORD,DUP,CFETCH,ONEPLUS
-            .WORD   HERE,OVER,ALLOT,SWAP,MOVE,EXIT
+            .WORD   LIT,PCQUOTE,COMPILECOMMA,LIT,022h,PARSE,DUP,CCOMMA
+            .WORD   HERE,OVER,ALLOT,SWAP,CMOVE,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -224,13 +242,30 @@ PAD:        PUSH    D           ; Save DE.
 
 
 ; ----------------------------------------------------------------------
+; PARSE [CORE EXT] 6.2.2008 ( char "ccc<char>" -- c-addr u )
+;
+; Parse ccc delimited by the delimiter char.
+;
+; c-addr is the address (within the input buffer) and u is the length of
+; the parsed string.  If the parse area was empty, the resulting string
+; has a zero length.
+;
+; ---
+; : PARSE ( char "ccc<char>" -- c-addr u) FALSE SWAP (parse) ;
+
+            LINKTO(PAD,0,5,'E',"SRAP")
+PARSE:      JMP     ENTER
+            .WORD   FALSE,SWAP,PPARSE,EXIT
+
+
+; ----------------------------------------------------------------------
 ; PICK [CORE EXT] 6.2.2030 ( xu ... x1 x0 u -- xu ... x1 x0 xu )
 ;
 ; Remove u.  Copy the xu to the top of the stack.  An ambiguous condition
 ; exists if there are less than u+2 items on the stack before PICK is
 ; executed.
 
-            LINKTO(PAD,0,4,'K',"CIP")
+            LINKTO(PARSE,0,4,'K',"CIP")
 PICK:       POP     H           ; Get u into HL,
             DAD     H           ; ..double the value to get a cell offset,
             DAD     SP          ; ..then add SP to get the stack offset.
@@ -350,7 +385,6 @@ BACKSLASH:  JMP     ENTER
 ; Runtime behavior of C": return c-addr.
 
             LINKTO(BACKSLASH,0,4,029h,"\"c(")
-LAST_COREEXT:
 PCQUOTE:    PUSH    D           ; Push string address onto the stack.
             LHLX                ; Read string count from instruction stream.
             MVI     H,0         ; Clear high byte, which is not part of count.
@@ -358,4 +392,140 @@ PCQUOTE:    PUSH    D           ; Push string address onto the stack.
             XCHG                ; IP to HL, count to DE.
             DAD     D           ; Add count to address to skip over string.
             XCHG                ; Put IP back in DE (pointing after string).
+            NEXT
+
+
+; ----------------------------------------------------------------------
+; (parse) [MFORTH] "paren-parse-paren" ( flag char "ccc<char>" -- c-addr u )
+;
+; Parse ccc delimited by the delimiter char.  If flag is true then leading
+; delimiters will be skipped and, if char is a space, then all control
+; characters will be treated as delimiters as well.
+;
+; c-addr is the address (within the input buffer) and u is the length of
+; the parsed string.  If the parse area was empty, the resulting string
+; has a zero length.
+
+            LINKTO(PCQUOTE,0,7,029h,"esrap(")
+LAST_COREEXT:
+PPARSE:     SAVEDE
+            SAVEBC
+
+            ; Get ICBLINEEND and ICBLINESTART on the stack.
+            LHLD    TICKICB     ; Get the current ICB into HL,
+            XCHG                ; ..then move it to DE,
+            LHLX                ; ..fetch ICBLINEEND,
+            PUSH    H           ; ..and push it to the stack.
+            INX     D           ; Increment to
+            INX     D           ; ..ICBLINESTART,
+            LHLX                ; ..fetch ICBLINESTART,
+            PUSH    H           ; ..and push it to the stack.
+            
+            ; Get >IN and add that to ICBLINESTART.
+            INX     D           ; Increment
+            INX     D           ; ..past SOURCE-ID
+            INX     D           ; ..to
+            INX     D           ; ..ICBTOIN,
+            LHLX                ; ..and fetch ICBTOIN.
+            POP     B           ; Pop ICBLINESTART
+            DAD     B           ; ..and add it to ICBTOIN to get srcpos.
+            MOV     D,H         ; Make a copy of srcpos
+            MOV     E,L         ; ..in DE.
+            
+            ; Calculate srcrem.
+            XTHL                ; Swap srcpos and ICBLINEEND.
+            POP     B           ; Pop srcpos into BC,
+            DSUB                ; ..then subtract srcpos from ICBLINEEND.
+            MOV     B,H         ; Move srcrem into B
+            MOV     C,L         ; ..and C.
+            XCHG                ; Get ICBLINESTART into HL as srcpos.
+            
+            ; Get the delimiter in D, flag in E, and push srcpos (aka c-addr).
+            POP     D           ; Pop char into E,
+            MOV     A,E         ; ..temporarily move to A,
+            POP     D           ; ..pop flag into E,
+            MOV     D,A         ; ..then move the delimiter back into D.
+            PUSH    H           ; Push the start position to the stack,
+            PUSH    H           ; ..then push c-addr to the stack.
+
+            ; Skip delimiters if required.
+            ; D=delim E=flag HL=srcpos BC=srcrem  Stack: startpos c-addr
+            MOV     A,E         ; Move the flag into A,
+            ORA     A           ; ..see if the flag is zero,
+            JZ      _pparseLOOP ; ..and skip ahead to the loop if so.
+_pparseSKIP:MOV     A,B         ; See if we have reached
+            ORA     C           ; ..the end of src
+            JZ      _pparseSKIP2; ..and exit the loop if so.
+            MOV     A,M         ; Get the next character at srcpos
+            CMP     D           ; ..and see if it is the same as delim;
+            JZ      _pparseSKIP1; ..keep skipping if so.
+            ANA     E           ; Not a match; but is our flag true?
+            JZ      _pparseSKIP2; ..if not, just start looping.
+            ANI     11100000b   ; Flag is true; is A a control char?
+            JNZ     _pparseSKIP2; ..if not, just start looping,
+            MOV     A,D         ; ..otherwise move delim to A,
+            CPI     020h        ; ..and see if the result is a space;
+            JNZ      _pparseSKIP2;..start looping if not, otherwise continue.
+_pparseSKIP1:INX    H           ; Increment srcpos,
+            DCX     B           ; ..decrement srcrem,
+            JMP     _pparseSKIP ; ..and continue skipping.
+_pparseSKIP2:INX    SP          ; Remove the old c-addr
+            INX     SP          ; ..from the stack
+            PUSH    H           ; ..and replace it with the post-delim c-addr.
+
+            ; Find the end of the delimited text.
+            ; D=delim E=flag HL=srcpos BC=srcrem  Stack: startpos c-addr
+_pparseLOOP:MOV     A,B         ; See if we have reached
+            ORA     C           ; ..the end of src
+            JZ      _pparseDONE ; ..and exit the loop if so.
+            MOV     A,M         ; Get the next character at srcpos
+            CMP     D           ; ..and see if it is the same as delim;
+            JZ      _pparseDONE ; ..we're done if so.
+            ANA     E           ; Not a match; but is our flag true?
+            JZ      _pparseLOOP1; ..if not just keep looping.
+            ANI     11100000b   ; Flag is true; is A a control char?
+            JNZ     _pparseLOOP1; ..if not, just keep looping,
+            MOV     A,D         ; ..otherwise move delim to A,
+            CPI     020h        ; ..and see if the result is a space;
+            JZ      _pparseDONE ; ..stop looping if so, otherwise continue.
+_pparseLOOP1:INX    H           ; Increment srcpos,
+            DCX     B           ; ..decrement srcrem,
+            JMP     _pparseLOOP ; ..and continue looping.
+
+            ; Update >IN and calculate the length of the parsed text.
+            ; HL=endpos  Stack: startpos c-addr
+_pparseDONE:MOV     D,B         ; Move srcrem to D
+            MOV     E,C         ; ..and E.
+            SHLD    HOLDH       ; Save endpos for later use.
+            POP     H           ; Pop c-addr from the stack,
+            POP     B           ; ..pop the start position into BC.
+            PUSH    H           ; ..then put c-addr back onto the stack,
+            LHLD    HOLDH       ; ..and restore endpos.
+            DSUB                ; Get the total number of bytes seen into HL.
+            MOV     A,D         ; See if we exhaused srcrem, in which case we do
+            ORA     E           ; ..not need to skip the (missing) final delim.
+            JZ      _pparseDONE1; No delim to skip if we hit EOL,
+            INX     H           ; ..otherwise increment length to include delim.
+_pparseDONE1:MOV    B,H         ; Move the total length to B
+            MOV     C,L         ; ..and C.
+            LHLD    TICKICB     ; Get the current ICB into HL,
+            INX     H           ; ..skip
+            INX     H           ; ..ahead
+            INX     H           ; ..to
+            INX     H           ; ..the
+            INX     H           ; ..>IN
+            INX     H           ; ..offset,
+            XCHG                ; ..move the offset to DE,
+            LHLX                ; ..load the current value of >IN into HL,
+            DAD     B           ; ..and add the parsed length to >IN.
+            SHLX                ; Save the new >IN.
+            
+            LHLD    HOLDH       ; Restore endpos again,
+            POP     B           ; ..get c-addr from the stack,
+            PUSH    B           ; ..put a copy of c-addr back onto the stack,
+            DSUB                ; ..then calculate the parsed length,
+            PUSH    H           ; ..and push that length onto the stack.
+            
+            RESTOREBC
+            RESTOREDE
             NEXT

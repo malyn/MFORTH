@@ -237,11 +237,26 @@ LCD:        CALL    STDCALL     ; Call the
 
 
 ; ----------------------------------------------------------------------
+; PARSE-WORD [MFORTH] ( "<spaces>name<space>" -- c-addr u )
+;
+; Skip leading spaces and parse name delimited by a space. c-addr is the
+; address within the input buffer and u is the length of the selected
+; string. If the parse area is empty, the resulting string has a zero length. 
+;
+; ---
+; : PARSE-WORD ( "<spaces>name<space>" -- c-addr u) TRUE BL (parse) ;
+
+            LINKTO(LCD,0,10,'D',"ROW-ESRAP")
+PARSEWORD:  JMP     ENTER
+            .WORD   TRUE,BL,PPARSE,EXIT
+
+
+; ----------------------------------------------------------------------
 ; PRN [MFORTH] "p-r-n" ( -- )
 ;
 ; Select the printer as the output device.
 
-            LINKTO(LCD,0,3,'N',"RP")
+            LINKTO(PARSEWORD,0,3,'N',"RP")
 PRN:        JMP     ENTER
             .WORD   ONE,LIT,0F675h,STORE,EXIT
 

@@ -134,11 +134,11 @@ _tick1:     .WORD   EXIT
 ;       rewrite this in assembly language so that we don't get hit by the
 ;       perf issues of processing one byte at a time in high-level code.
 ;
-; : ( ( "ccc<quote>" --)   CHAR] ) PARSE  2DROP ;
+; : ( ( "ccc<quote>" --)   CHAR] ) PARSE 2DROP ;
 
             LINKTO(TICK,1,1,028h,"")
 PAREN:      JMP     ENTER
-            .WORD   LIT,029h,WORD,DROP,EXIT
+            .WORD   LIT,029h,PARSE,TWODROP,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -1065,11 +1065,11 @@ CELLS:      POP     H           ; Pop x1.
 ; Skip leading space delimiters.  Parse name delimited by a space.  Put
 ; the value of its first character onto the stack.
 ;
-; : CHAR ( "<spaces>name" -- char)   BL WORD 1+ C@ ;
+; : CHAR ( "<spaces>name" -- char)   PARSE-WORD DROP C@ ;
 
             LINKTO(CELLS,0,4,'R',"AHC")
 CHAR:       JMP     ENTER
-            .WORD   BL,WORD,ONEPLUS,CFETCH,EXIT
+            .WORD   PARSEWORD,DROP,CFETCH,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -1157,8 +1157,8 @@ CR:         CALL    STDCALL     ; Call the
 ;       semantics of name may be extended by using DOES>.
 ;
 ; : CREATE ( "<spaces>name" -- )
-;   BL WORD   DUP C@ 0= IF ABORT THEN -- TODO: check for >63
-;   COUNT 2>B  B# 1+ ALLOT  HERE 1-  B# OVER C!
+;   PARSE-WORD  DUP 0= IF ABORT THEN DUP 63 > IF ABORT THEN
+;   2>B  B# 1+ ALLOT  HERE 1-  B# OVER C!
 ;   FORB 1- B@ OVER C! NEXTB  DUP C@ 128 OR SWAP C!
 ;   LATEST @ ,  [ PROFILER ] [IF] 0 , [THEN]
 ;   HERE NFATOCFASZ - LATEST !  195 C, DOCREATE , -- JMP DOCREATE
@@ -1166,12 +1166,13 @@ CR:         CALL    STDCALL     ; Call the
 
             LINKTO(CR,0,6,'E',"TAERC")
 CREATE:     JMP     ENTER
-            .WORD   BL,WORD,DUP,CFETCH,ZEROEQUALS,zbranch,_create1,ABORT
-_create1:   .WORD   COUNT,TWOTOB,BNUMBER,ONEPLUS,ALLOT,HERE,ONEMINUS
+            .WORD   PARSEWORD,DUP,ZEROEQUALS,zbranch,_create1,ABORT
+_create1:   .WORD   DUP,LIT,63,GREATERTHAN,zbranch,_create2,ABORT
+_create2:   .WORD   TWOTOB,BNUMBER,ONEPLUS,ALLOT,HERE,ONEMINUS
             .WORD       BNUMBER,OVER,CSTORE
-_create2:   .WORD   BQUES,zbranch,_create3,ONEMINUS,BFETCH,OVER,CSTORE
-            .WORD       BPLUS,branch,_create2
-_create3:   .WORD   DUP,CFETCH,LIT,128,OR,SWAP,CSTORE
+_create3:   .WORD   BQUES,zbranch,_create4,ONEMINUS,BFETCH,OVER,CSTORE
+            .WORD       BPLUS,branch,_create3
+_create4:   .WORD   DUP,CFETCH,LIT,128,OR,SWAP,CSTORE
             .WORD   LATEST,FETCH,COMMA
 #IFDEF PROFILER
             .WORD   ZERO,COMMA
@@ -2184,14 +2185,13 @@ _rshiftDONE:PUSH    H           ; Push the result (HL).
 ;   Return c-addr and u describing a string consisting of the characters
 ;   ccc.  A program shall not alter the returned string.
 ;
-; TODO: Really should use PARSE here instead of WORD COUNT.
 ; : S" ( "ccc<quote>" --)   ['] (S") COMPILE,
-;   [CHAR] " PARSE  DUP ,  HERE OVER ALLOT SWAP MOVE ;
+;   [CHAR] " PARSE  DUP ,  HERE OVER ALLOT SWAP CMOVE ;
 
             LINKTO(RSHIFT,1,2,022h,"S")
 SQUOTE:     JMP     ENTER
-            .WORD   LIT,PSQUOTE,COMPILECOMMA,LIT,022h,WORD,COUNT,DUP,COMMA
-            .WORD   HERE,OVER,ALLOT,SWAP,MOVE,EXIT
+            .WORD   LIT,PSQUOTE,COMPILECOMMA,LIT,022h,PARSE,DUP,COMMA
+            .WORD   HERE,OVER,ALLOT,SWAP,CMOVE,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -2648,96 +2648,15 @@ WHILE:      JMP     ENTER
 ;
 ; ---
 ; : WORD ( char "<chars>ccc<char>" -- c-addr)
-;   SOURCE >IN @ /STRING ( char src srclen) 'WORD (word) >IN +! ;
+;   TRUE SWAP (parse) >R 'WORD 1+ R@ CMOVE
+;   R@ 'WORD C!  BL 'WORD 1+ R> + C!
+;   'WORD ;
 
             LINKTO(WHILE,0,4,'D',"ROW")
 WORD:       JMP     ENTER
-            .WORD   SOURCE,TOIN,FETCH,SLASHSTRING,TICKWORD,pword
-            .WORD   TOIN,PLUSSTORE,EXIT
-
-; : (word) ( char src srclen word -- word srcadj) ...
-;   A=char HL=srcpos DE=wordpos C=srcrem
-
-            LINKTO(WORD,0,6,029h,"drow(")
-pword:      SAVEDE
-            SAVEBC
-            POP     D           ; Get word in DE.
-            POP     B           ; Get srclen in C,
-            MOV     A,C         ; ..then temporarily move srclen to A.
-            POP     H           ; Get src in HL.
-            POP     B           ; Get char in C,
-            MOV     B,C         ; ..then move char to B,
-            MOV     C,A         ; ..and srclen to C.
-            
-            PUSH    D           ; Push word
-            PUSH    H           ; ..and src for use in the DONE label.
-            
-            MVI     A,0         ; Initialize the word length
-            STAX    D           ; ..to zero
-            INX     D           ; ..and advance to the first char in word.
-
-            INR     C           ; See if srclen was
-            DCR     C           ; ..zero
-            JZ      _pwordNOBYTES;..and skip the loops if so.
-            
-_pwordSKIP: MOV     A,M         ; Get the next char at srcpos
-            CMP     B           ; ..and see if it is the same as the delim;
-            JZ      _pwordSKIP1 ; ..keep skipping if so.
-            ANI     11100000b   ; Not a match; but is A a control char?
-            JNZ     _pwordPRECOPY;..if not, just start copying,
-            MOV     A,B         ; ..otherwise see if delim
-            CPI     020h        ; ..is space;
-            JNZ     _pwordPRECOPY;..and copy if so, otherwise keep skipping.
-_pwordSKIP1:INX     H           ; Advance to the next src location,
-            DCR     C           ; ..decrement srclen,
-            JNZ     _pwordSKIP  ; ..and keep copying if there are more chars.
-
-_pwordNOBYTES:PUSH  H           ; No bytes to copy, so push srcpos as copystart
-            JMP     _pwordDONE  ; ..and then jump to the end.
-
-_pwordPRECOPY:PUSH  H           ; Push srcpos as copystart to the stack.
-_pwordCOPY: MOV     A,M         ; Get the next char at srcpos
-            CMP     B           ; ..and see if it is the same as delim;
-            JZ      _pwordDONE  ; ..stop copying if so.
-            STAX    D           ; Copy char to wordpos before we corrupt A.
-            ANI     11100000b   ; Not a match; but is A a control char?
-            JNZ     _pwordCOPY1 ; ..if not, just keep copying,
-            MOV     A,B         ; ..otherwise see if delim
-            CPI     020h        ; ..is space;
-            JZ      _pwordDONE  ; ..and stop if so, otherwise keep copying.
-_pwordCOPY1:INX     D           ; Advance wordpos,
-            INX     H           ; ..advance srcpos,
-            DCR     C           ; ..decrement srclen,
-            JNZ     _pwordCOPY  ; ..and keep copying if there are more chars.
-
-_pwordDONE: MVI     A,' '       ; Write out the trailing space that is
-            STAX    D           ; ..supposed to be present after the word.
-
-            INR     C           ; See if we hit srclen, in which case we do
-            DCR     C           ; ..not need to skip the (missing) final delim.
-            
-            POP     D           ; Pop copystart into DE.
-            POP     B           ; Pop the initial src into BC.
-            PUSH    H           ; Preserve the final srcpos (aka copyend).
-            JZ      _pwordDONEEOL;Hit EOL if we hit srclen, so no final delim;
-            DCX     B           ; ..otherwise decrement src to skip final delim.
-_pwordDONEEOL:DSUB              ; HL=copyend-src (aka srcadj)
-
-            XTHL                ; Swap srcadj for copyend.
-            MOV     B,D         ; Get copystart into B
-            MOV     C,E         ; ..and C.
-            DSUB                ; HL=copyend-copystart (aka wordlen)
-            MOV     A,L         ; Get wordlen in A,
-            POP     H           ; ..then pop srcadj back into HL,
-            POP     D           ; ..and the original word pointer into DE;
-            STAX    D           ; ..then store copylen at word[0].
-            
-            PUSH    D           ; Push word
-            PUSH    H           ; ..and srcadj to the stack.
-            
-            RESTOREBC
-            RESTOREDE
-            NEXT
+            .WORD   TRUE,SWAP,PPARSE,TOR,TICKWORD,ONEPLUS,RFETCH,CMOVE
+            .WORD   RFETCH,TICKWORD,CSTORE,BL,TICKWORD,ONEPLUS,RFROM,PLUS,CSTORE
+            .WORD   TICKWORD,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -2745,7 +2664,7 @@ _pwordDONEEOL:DSUB              ; HL=copyend-src (aka srcadj)
 ;
 ; x3 is the bit-by-bit exclusive-or of x1 with x2.
 
-            LINKTO(pword,0,3,'R',"OX")
+            LINKTO(WORD,0,3,'R',"OX")
 XOR:        SAVEDE
             POP     H           ; Pop x2.
             POP     D           ; Pop x1.
@@ -2765,8 +2684,10 @@ XOR:        SAVEDE
 ;
 ; Interpretation:
 ;   Interpretation semantics for this word are undefined.
+;
 ; Compilation:
 ;   Perform the execution semantics given below.
+;
 ; Execution: ( -- )
 ;   Enter interpretation state.  [ is an immediate word.
 
