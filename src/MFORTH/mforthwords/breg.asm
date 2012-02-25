@@ -54,6 +54,7 @@ TICKBEND:   JMP     DOUSER
 ;
 ; Pop an address and length from the stack and store the range in B.
 ;
+; ---
 ; : 2>B  ( c-addr u --)   OVER + 'Bend !  'B ! ;
 
             LINKTO(TICKBEND,0,3,'B',">2")
@@ -66,6 +67,7 @@ TWOTOB:     JMP     ENTER
 ;
 ; Pop an address from the stack and put the address into the B register.
 ;
+; ---
 ; : >B ( c-addr --)   'B ! ;
 
             LINKTO(TWOTOB,0,2,'B',">")
@@ -84,6 +86,7 @@ TOB:        JMP     ENTER
 ;   enclosing FORB ... NEXTB if flag is true.  Otherwise continue execution
 ;   at the next instruction.
 ;
+; ---
 ; ?ENDB   POSTPONE IF
 ;   ['] branch COMPILE,  HERE  'PREVENDB @ ,  'PREVENDB !
 ;   POSTPONE THEN ; IMMEDIATE
@@ -100,6 +103,7 @@ QENDB:      JMP     ENTER
 ;
 ; Push the B register to the stack.
 ;
+; ---
 ; : B ( -- c-addr)  'B @ ;
 
             LINKTO(QENDB,0,1,'B',"")
@@ -118,6 +122,7 @@ B:          MOV     H,B
 ;
 ; Pop a byte from the stack and store it at B.
 ;
+; ---
 ; : B! (c --)   B C! ;
 
             LINKTO(B,0,2,'!',"B")
@@ -140,6 +145,7 @@ BSTORE:     MOV     H,B
 ; Pop a byte from the stack, store it at B, then increment the B register
 ; by one (byte address location).
 ;
+; ---
 ; : B!+ ( c --)   B! B+ ;
 
             LINKTO(BSTORE,0,3,'+',"!B")
@@ -152,6 +158,7 @@ BSTOREPLUS: JMP     ENTER
 ;
 ; Push the number of bytes remaining in the range defined by B.
 ;
+; ---
 ; : B# ( -- u)   'Bend @  B  - ;
 
             LINKTO(BSTOREPLUS,0,2,'#',"B")
@@ -178,6 +185,7 @@ BNUMBER:    PUSH    B
 ;
 ; Increment the B register by one (byte address location).
 ;
+; ---
 ; : B+ ( --)  1 CHARS 'B +! ;
 
             LINKTO(BNUMBER,0,2,'+',"B")
@@ -195,6 +203,7 @@ _bplusDONE: NEXT
 ;
 ; flag is true if and only if there are more bytes in B.
 ;
+; ---
 ; : B? ( -- f)   B# 0 > ;
 
             LINKTO(BPLUS,0,2,'?',"B")
@@ -223,6 +232,7 @@ _bquesDONE: XTHL
 ;
 ; Fetch the byte at B.
 ;
+; ---
 ; : B@ ( -- c)   B C@ ;
 
             LINKTO(BQUES,0,2,'@',"B")
@@ -245,6 +255,7 @@ BFETCH:     MOV     H,B
 ; Fetch the byte at B, then increment the B register by one (byte address
 ; location.
 ;
+; ---
 ; : B@+ ( -- c)   B@ B+ ;
 
             LINKTO(BFETCH,0,3,'+',"@B")
@@ -298,6 +309,7 @@ FORB:       JMP     ENTER
 ; Run-time: ( -- )
 ;   Increment 'B and continue execution at the location specified by dest.
 ;
+; ---
 ; NEXTB   POSTPONE B+ POSTPONE AGAIN  'PREVENDB @ HERE>CHAIN ; IMMEDIATE
 
             LINKTO(FORB,1,5,'B',"TXEN")

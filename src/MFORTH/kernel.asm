@@ -34,9 +34,8 @@
 ;
 ; The Return Stack Pointer is stored in BC and always points at the next
 ; available location in the return stack.  The return stack grows downward
-; and is confined to the 256 bytes (128 cells) between $FDFF and $FD00.
-; TODO: RSPUSH and RSPOP check that the return stack has not left $FDxx
-; and ABORT (with a message) if the return stack has over- or under-flowed.
+; and is confined to the 64 bytes (32 cells) between $xx7F and $xx40 in the
+; Task Page.
 
 ;RSPUSH:    MOV     A,E         ;[1. 5]
 ;           STAX    B           ;[1. 7]
@@ -91,7 +90,7 @@
 ; Direct-threaded code interpreter
 ;
 ; DE is the Instruction Pointer and an undocumented 8085 opcode is used
-; to transfer the location pointed to be DE into HL, the Word pointer.
+; to transfer the location pointed to by DE into HL, the Word pointer.
 
 #IFNDEF PROFILER
 ;NEXT:      LHLX                ;[1.10] (IP) -> W

@@ -34,6 +34,7 @@
 ;
 ; Display d in free field format.
 ;
+; ---
 ; : D. ( d -- )
 ;   BASE @ 10 <>  IF UD. EXIT THEN
 ;   2DUP D0< >R DABS <# #S R> SIGN #> TYPE SPACE ;
@@ -87,6 +88,7 @@ DMINUS:     SAVEDE
 ;
 ; flag is true if and only if d is less than zero.
 ;
+; ---
 ; : D0< ( d -- flag)   SWAP DROP 0< ;
 
             LINKTO(DMINUS,0,3,'<',"0D")
@@ -119,6 +121,7 @@ _dwostarDONE:PUSH    H          ; Push xd2h to the stack.
 ;
 ; ud is the absolute value of d.
 ;
+; ---
 ; : DABS ( d -- ud )   DUP ?DNEGATE ;
 
             LINKTO(DTWOSTAR,0,4,'S',"BAD")
@@ -131,6 +134,7 @@ DABS:       JMP     ENTER
 ;
 ; d2 is the negation of d1.
 ;
+; ---
 ; : DNEGATE ( d1 -- d2)   INVERT SWAP INVERT SWAP 1 M+ ;
 
             LINKTO(DABS,0,7,'E',"TAGEND")

@@ -38,6 +38,7 @@
 ; .S may be implemented using pictured numeric output words.  Consequently,
 ; its use may corrupt the transient region identified by #>.
 ;
+; ---
 ; .S ( --)   DEPTH BEGIN ?DUP WHILE DUP PICK . 1- REPEAT ;
 
             LINKTO(LINK_TOOLS,0,2,'S',".")
@@ -56,6 +57,7 @@ _dots2:     .WORD   EXIT
 ; DUMP may be implemented using pictured numeric output words. Consequently,
 ; its use may corrupt the transient region identified by #>.
 ;
+; ---
 ; MFORTH Output Format (screen represented by the box):
 ; +----------------------------------------+
 ; |0000  00 01 02 03 04 05 06 07  Hello th |
@@ -110,6 +112,7 @@ _dumpline2: .WORD   DUP,I,PLUS,CFETCH,EMITVALID,ploop,_dumpline2
 ; WORDS may be implemented using pictured numeric output words.
 ; Consequently, its use may corrupt the transient region identified by #>.
 ;
+; ---
 ; : WORDS ( -- )
 ;   LATEST @  BEGIN  DUP HIDDEN? 0=  IF SPACE DUP .NAME THEN
 ;   NFA>LFA @  DUP 0= UNTIL DROP ;
@@ -134,6 +137,7 @@ _words2:    .WORD   NFATOLFA,FETCH,DUP,ZEROEQUALS,zbranch,_words1
 ; Display the name of the dictionary entry pointed to by nfa-addr (which
 ; points to the length field).
 ;
+; ---
 ; : .NAME ( nfa-addr -- )
 ;   BEGIN  1- DUP C@  DUP 127 AND EMIT  128 AND UNTIL DROP ;
 

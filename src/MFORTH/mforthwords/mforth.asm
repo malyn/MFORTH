@@ -52,6 +52,7 @@ DASHROT:    SAVEDE
 ; The space in the 16th position will be replaced with a "P" if this is a
 ; build that includes the profiler.
 ;
+; ---
 ; : .VER ( --)
 ;   ." MFORTH v"
 ;   MFORTH_MAJOR [CHAR] 0 + EMIT  [CHAR] . EMIT
@@ -102,6 +103,7 @@ TWONIP:     SAVEDE
 ; clears the stack and calls QUIT, which clears the return stack and enters
 ; the infinite text interpreter loop).
 ;
+; ---
 ; : COLD ( i*x --; R: j*x --)
 ;   PAGE  .VER 2 SPACES ." (C)Michael Alyn Miller"
 ;   INS-ROMTRIG INIT-FCBS ABORT ;
@@ -179,6 +181,7 @@ INITRP:     MVI     C,07Fh
 ; Insert our ROM Trigger file, replacing an existing ROM Trigger file with
 ; our own if one is found.
 ;
+; ---
 ; : INS-ROMTRIG ( --)
 ;   FIND-ROMTRIG  DUP 0= IF FREDIR THEN  >B
 ;   240 B!+  255 B!+ 255 B!+  S" MFORTH" B SWAP  DUP B + >B  MOVE

@@ -52,6 +52,7 @@ STORE:      SAVEDE
 ; output string.  An ambiguous condition exists if # executes outside of a
 ; <# #> delimited number conversion.
 ;
+; ---
 ; : # ( ud1 -- ud2 )   BASE @ UD/MOD ROT >digit HOLD ;
 
             LINKTO(STORE,0,1,'#',"")
@@ -67,6 +68,7 @@ NUMSIGN:    JMP     ENTER
 ; string.  c-addr and u specify the resulting character string.  A program
 ; may replace characters within the string.
 ;
+; ---
 ; : #> ( xd -- c-addr u ) DROP DROP  HLD @  HERE HLDEND +  OVER - ;
 
             LINKTO(NUMSIGN,0,2,'>',"#")
@@ -82,6 +84,7 @@ NUMSIGNGRTR:JMP     ENTER
 ; until the quotient is zero.  ud2 is zero.  An ambiguous condition exists
 ; if #S executes outside of a <# #> delimited number conversion.
 ;
+; ---
 ; : #S ( ud1 -- 0 )   BEGIN # 2DUP OR WHILE REPEAT ;
 
             LINKTO(NUMSIGNGRTR,0,2,'S',"#")
@@ -99,6 +102,7 @@ _numsigns2: .WORD   EXIT
 ;
 ; When interpreting, ' xyz EXECUTE is equivalent to xyz.
 ;
+; ---
 ; : ' ( "<spaces>name" -- xt)
 ;   PARSE-WORD (FIND)  0= IF TYPE SPACE [CHAR] ? EMIT CR ABORT THEN ;
 
@@ -146,6 +150,7 @@ PAREN:      JMP     ENTER
 ;
 ; Multiply n1|u1 by n2|u2 giving the product n3|u3.
 ;
+; ---
 ; : * ( n1|u1 n2|u2 -- n3|u3 )   UM* DROP ;
 
             LINKTO(PAREN,0,1,'*',"")
@@ -164,6 +169,7 @@ STAR:       JMP     ENTER
 ; by either the phrase >R M* R> FM/MOD SWAP DROP or the phrase
 ; >R M* R> SM/REM SWAP DROP.
 ;
+; ---
 ; : */ ( n1 n2 n3 -- n4)   */MOD NIP ;
 
             LINKTO(STAR,0,2,'/',"*")
@@ -182,6 +188,7 @@ STARSLASH:  JMP     ENTER
 ; returned will be the same as that returned by either the phrase
 ; >R M* R> FM/MOD or the phrase >R M* R> SM/REM. 
 ;
+; ---
 ; : */MOD ( n1 n2 n3 -- n4 n5)   >R M* R> SM/REM ;
 
             LINKTO(STARSLASH,0,5,'D',"OM/*")
@@ -244,6 +251,7 @@ PLUSSTORE:  SAVEDE
 ;   current loop control parameters and continue execution immediately
 ;   following the loop.
 ;
+; ---
 ; +LOOP   ['] (pplusloop) END-LOOP ; IMMEDIATE
 
             LINKTO(PLUSSTORE,1,5,'P',"OOL+")
@@ -259,6 +267,7 @@ PLUSLOOP    JMP     ENTER
 ; aligned when , finishes execution.  An ambiguous condition exists if the
 ; data-space pointer is not aligned prior to execution of ,.
 ;
+; ---
 ; : , ( x -- )   HERE !  1 CELLS ALLOT ;
 
             LINKTO(PLUSLOOP,0,1,02Ch,"")
@@ -290,6 +299,7 @@ MINUS:      SAVEDE
 ;
 ; Display n in free field format.
 ;
+; ---
 ; : . ( n -- )
 ;   BASE @ 10 <>  IF U. EXIT THEN
 ;   DUP ABS 0 <# #S ROT SIGN #> TYPE SPACE ;
@@ -315,6 +325,7 @@ _dot1:      .WORD   DUP,ABS,ZERO,LESSNUMSIGN,NUMSIGNS,ROT,SIGN,NUMSIGNGRTR
 ; Run-time: ( -- )
 ;   Display ccc.
 ;
+; ---
 ; : ." ( "ccc<quote>" --)   POSTPONE S" POSTPONE TYPE ; IMMEDIATE
 
             LINKTO(DOT,1,2,022h,".")
@@ -331,6 +342,7 @@ DOTQUOTE:   JMP     ENTER
 ; by either the phrase >R S>D R> FM/MOD SWAP DROP or the phrase
 ; >R S>D R> SM/REM SWAP DROP.
 ;
+; ---
 ; : / ( n1 n2 -- n3)   /MOD NIP ;
 
             LINKTO(DOTQUOTE,0,1,'/',"")
@@ -347,6 +359,7 @@ SLASH:      JMP     ENTER
 ; same as that returned by either the phrase >R S>D R> FM/MOD or the phrase
 ; >R S>D R> SM/REM.
 ;
+; ---
 ; : /MOD ( n1 n2 -- n3 n4)   >R S>D R> SM/REM ;
 
             LINKTO(SLASH,0,4,'D',"OM/")
@@ -578,6 +591,7 @@ TWOSWAP:    SAVEDE
 ;       Execute the definition name.  The stack effects i*x and j*x
 ;       represent arguments to and results from name, respectively.
 
+; ---
 ; : : ( "<spaces>name" -- )
 ;   CREATE HIDE ]  CFASZ NEGATE ALLOT  195 C, DOCOLON , ; -- JMP DOCOLON
 
@@ -603,6 +617,7 @@ COLON:      JMP     ENTER
 ; Run-time: ( -- ) ( R: nest-sys -- )
 ;   Return to the calling definition specified by nest-sys.
 ;
+; ---
 ; : ; ( -- )   REVEAL  ['] EXIT COMPILE,  POSTPONE [ ; IMMEDIATE
 
             LINKTO(COLON,1,1,';',"")
@@ -643,6 +658,7 @@ _ltDONE:    PUSH    H           ; Push the flag to the stack.
 ;
 ; Initialize the pictured numeric output conversion process.
 ;
+; ---
 ; : <# ( -- )   HERE HLDEND + HLD ! ;
 
             LINKTO(LESSTHAN,0,2,'#',"<")
@@ -693,6 +709,7 @@ GREATERTHAN:JMP     ENTER
 ; a-addr is the data-field address corresponding to xt.  An ambiguous
 ; condition exists if xt is not for a word defined via CREATE.
 ;
+; ---
 ; : >BODY ( xt -- a-addr)   CFASZ + ;
 
             LINKTO(GREATERTHAN,0,5,'Y',"DOB>")
@@ -727,6 +744,8 @@ TOIN:       JMP     ENTER
 ; converted.  u2 is the number of unconverted characters in the string.  An
 ; ambiguous condition exists if ud2 overflows during the conversion.
 ;
+; ---
+; : >NUMBER ( ud1 c-addr1 u1 -- ud2 c-addr2 u2)
 ;   2>B  BEGIN B? WHILE
 ;       B@ DIGIT? 0= IF B B# EXIT THEN
 ;       ( ud1 u) >R BASE @ UD* R> M+
@@ -794,6 +813,7 @@ FETCH:      POP     H           ; Pop address to fetch into HL
 ; Empty the data stack and perform the function of QUIT, which includes
 ; emptying the return stack, without displaying a message.
 ;
+; ---
 ; : ABORT ( i*x -- ) ( R: j*x -- )
 ;   TASK [HEX] FF OR SP!  10 BASE !  QUIT ;
 ;
@@ -823,6 +843,7 @@ ABORT:      JMP     ENTER
 ;   and perform an implementation-defined abort sequence that includes the
 ;   function of ABORT.
 ;
+; ---
 ; : ABORT"   POSTPONE IF POSTPONE ." POSTPONE ABORT THEN ; IMMEDIATE
 
             LINKTO(ABORT,1,6,022h,"TROBA")
@@ -835,6 +856,7 @@ ABORTQUOTE: JMP     ENTER
 ;
 ; u is the absolute value of n.
 ;
+; ---
 ; : ABS ( n -- u )   DUP ?NEGATE ;
 
             LINKTO(ABORTQUOTE,0,3,'S',"BA")
@@ -859,6 +881,7 @@ ABS:        JMP     ENTER
 ;
 ; +n2 is the length of the string stored at c-addr.
 ;
+; ---
 ; : ACCEPT ( c-addr max -- n)
 ;   2DUP 2>B DROP  ( ca-start)
 ;   BEGIN  KEY  DUP 13 <> WHILE
@@ -918,6 +941,7 @@ ALIGNED:    NEXT                ; No-op in MFORTH; no alignment needed.
 ; the size of a character when ALLOT begins execution, it will remain
 ; character aligned when ALLOT finishes execution.
 ;
+; ---
 ; : ALLOT ( n -- )   DP +! ;
 
             LINKTO(ALIGNED,0,5,'T',"OLLA")
@@ -970,6 +994,7 @@ BASE:       JMP     DOUSER
 ; Run-time: ( -- )
 ;   Continue execution.
 ;
+; ---
 ; : BEGIN   HERE ; IMMEDIATE
 
             LINKTO(BASE,1,5,'N',"IGEB")
@@ -1013,6 +1038,7 @@ CSTORE:     SAVEDE
 ; An ambiguous condition exists if the data-space pointer is not
 ; character-aligned prior to execution of C,.
 ;
+; ---
 ; : C, ( char -- )   HERE C!  1 CHARS ALLOT ;
 
             LINKTO(CSTORE,0,2,02Ch,"C")
@@ -1065,6 +1091,7 @@ CELLS:      POP     H           ; Pop x1.
 ; Skip leading space delimiters.  Parse name delimited by a space.  Put
 ; the value of its first character onto the stack.
 ;
+; ---
 ; : CHAR ( "<spaces>name" -- char)   PARSE-WORD DROP C@ ;
 
             LINKTO(CELLS,0,4,'R',"AHC")
@@ -1104,6 +1131,7 @@ CHARS:      NEXT                ; No-op in MFORTH, because chars are 1 byte.
 ; name Execution: ( -- x )
 ;   Place x on the stack.
 ;
+; ---
 ; : CONSTANT ( x "<spaces>name" -- )
 ;   CREATE  CFASZ NEGATE ALLOT  195 C, DOCONSTANT ,  , ; -- JMP DOCONSTANT
 
@@ -1152,10 +1180,11 @@ CR:         CALL    STDCALL     ; Call the
 ; align it.  The new data-space pointer defines name's data field.  CREATE
 ; does not allocate data space in name's data field.
 ;
-;   name Execution:	( -- a-addr )
+;   name Execution: ( -- a-addr )
 ;       a-addr is the address of name's data field.  The execution
 ;       semantics of name may be extended by using DOES>.
 ;
+; ---
 ; : CREATE ( "<spaces>name" -- )
 ;   PARSE-WORD  DUP 0= IF ABORT THEN DUP 63 > IF ABORT THEN
 ;   2>B  B# 1+ ALLOT  HERE 1-  B# OVER C!
@@ -1198,6 +1227,7 @@ DECIMAL:    JMP     ENTER
 ; +n is the number of single-cell values contained in the data stack
 ; before +n was placed on the stack.
 ;
+; ---
 ; : DEPTH ( -- +n)   SP  TASK [HEX] FF OR  SWAP - 2/ ;
 
             LINKTO(DECIMAL,0,5,'H',"TPED")
@@ -1265,9 +1295,10 @@ DO:         JMP     ENTER
 ;   semantics appended by the DOES> which modified name.  The stack effects
 ;   i*x and j*x represent arguments to and results from name, respectively.
 ;
+; ---
 ; : (does>)
-;   R>                  -- Get the new CFA for this def, which also exits the
-;                       -- the current def since we just popped the defining
+;   R>                  -- Get the new CFA for this def'n, which also exits
+;                       -- the current def'n since we just popped the defining
 ;                       -- word's address from the return stack.
 ;   LATEST @ NFA>CFA    -- Get address of LATEST's CFA.
 ;   195 OVER C!  1+ !   -- Replace CFA with a JMP (195) to the code after DOES>
@@ -1325,6 +1356,7 @@ DUP:        POP     H
 ; Run-time: ( -- )
 ;   Continue execution at the location given by the resolution of orig2.
 ;
+; ---
 ; : ELSE   ['] branch COMPILE,  HERE DUP ,  SWAP POSTPONE THEN ; IMMEDIATE
 
             LINKTO(DUP,1,4,'E',"SLE")
@@ -1365,6 +1397,8 @@ EMIT:       POP     H           ; Pop the character into HL
 ; the system treats the attribute as unknown, the returned flag is false;
 ; otherwise, the flag is true and the i*x returned is of the type specified in
 ; the table for the attribute queried.
+;
+; TODO: Implement ENVIRONMENT?
 
 
 ; ----------------------------------------------------------------------
@@ -1376,6 +1410,7 @@ EMIT:       POP     H           ; Pop the character into HL
 ; When the parse area is empty, restore the prior input source specification.
 ; Other stack effects are due to the words EVALUATEd.
 ;
+; ---
 ; : EVALUATE ( i*x c-addr u -- j*x)
 ;   PUSHICB  OVER + ICB 2!  -1 ICB ICBSOURCEID + !  INTERPRET  POPICB ;
 
@@ -1419,6 +1454,7 @@ EXIT:       RSPOP(D,E)
 ; If u is greater than zero, store char in each of u consecutive
 ; characters of memory beginning at c-addr.
 ;
+; ---
 ; : FILL ( c-addr u char --)   ROT ROT 2>B FORB DUP B! NEXTB DROP ;
 
             LINKTO(EXIT,0,4,'L',"LIF")
@@ -1463,6 +1499,7 @@ _find1:     .WORD   EXIT
 ; sign of the divisor or is zero, and the quotient is rounded to its
 ; arithmetic floor.
 ;
+; ---
 ; : FM/MOD ( d1 n1 -- n2 n3)
 ;   DUP >R ( num den R:signrem) 2DUP XOR ( num den signquo R:signrem)
 ;   SWAP ABS DUP >R ( num signquo +den R:signrem +den)
@@ -1502,6 +1539,7 @@ HERE:       LHLD    DP
 ; ambiguous condition exists if HOLD executes outside of a <# #> delimited
 ; number conversion.
 ;
+; ---
 ; : HOLD ( c -- )   HLD @ 1- DUP HLD ! C! ;
 
             LINKTO(HERE,0,4,'D',"LOH")
@@ -1542,6 +1580,7 @@ I:          RSFETCH(H,L)        ; Get the loop index into HL
 ;   If all bits of x are zero, continue execution at the location specified
 ;   by the resolution of orig.
 ;
+; ---
 ; : IF   ['] 0branch COMPILE,  HERE DUP , ; IMMEDIATE
 
             LINKTO(I,1,2,'F',"I")
@@ -1612,6 +1651,7 @@ J:          RSPICK2(H,L)        ; Get the second loop index (the 3rd RS item)
 ; 3.1.2.1 Graphic characters.  Programs that require the ability to receive
 ; control characters have an environmental dependency.
 ;
+; ---
 ; TODO: Apparently the Model 100 does magical, special things here and can
 ; convert function keys to text (maybe we can use this as a macro feature?),
 ; and sets Carry when the key is "special".  We probably want to avoid "special"
@@ -1640,6 +1680,7 @@ KEY:        CALL    STDCALL     ; Call the
 ;   following the innermost syntactically enclosing DO ... LOOP or
 ;   DO ... +LOOP.
 ;
+; ---
 ; LEAVE ( do-orig)
 ;   ['] UNLOOP COMPILE,  ['] branch COMPILE,
 ;   HERE  'PREVLEAVE @ ,  'PREVLEAVE !
@@ -1664,6 +1705,7 @@ LEAVE:      JMP     ENTER
 ; Run-time: ( -- x )
 ;   Place x on the stack.
 ;
+; ---
 ; : LITERAL ( x -- )   ['] LIT COMPILE,  ,  ; IMMEDIATE
 
             LINKTO(LEAVE,1,7,'L',"ARETIL")
@@ -1690,6 +1732,7 @@ LITERAL:    JMP     ENTER
 ;   execution immediately following the loop.  Otherwise continue execution
 ;   at the beginning of the loop.
 ;
+; ---
 ; : LOOP   ['] (loop) END-LOOP ; IMMEDIATE
 
             LINKTO(LITERAL,1,4,'P',"OOL")
@@ -1723,6 +1766,7 @@ _lshiftDONE:PUSH    H           ; Push the result (HL).
 ;
 ; d is the signed product of n1 times n2.
 ;
+; ---
 ; : M* ( n1 n2 -- d )   2DUP XOR 0< >R  ABS SWAP ABS UM*  R> ?DNEGATE ;
 
             LINKTO(LSHIFT,0,2,'*',"M")
@@ -1736,6 +1780,7 @@ MSTAR:      JMP     ENTER
 ;
 ; n3 is the greater of n1 and n2.
 ;
+; ---
 ; : MAX ( n1 n2 -- n3 )   2DUP < IF SWAP THEN DROP ;
 
             LINKTO(MSTAR,0,3,'X',"AM")
@@ -1749,6 +1794,7 @@ _maxDONE:   .WORD   DROP,EXIT
 ;
 ; n3 is the lesser of n1 and n2.
 ;
+; ---
 ; : MIN ( n1 n2 -- n3 )   2DUP > IF SWAP THEN DROP ;
 
             LINKTO(MAX,0,3,'N',"IM")
@@ -1766,6 +1812,7 @@ _minDONE:   .WORD   DROP,EXIT
 ; by either the phrase >R S>D R> FM/MOD DROP or the phrase
 ; >R S>D R> SM/REM DROP.
 ;
+; ---
 ; : MOD ( n1 n2 -- n3)   /MOD DROP ;
 
             LINKTO(MIN,0,3,'D',"OM")
@@ -1781,6 +1828,7 @@ MOD:        JMP     ENTER
 ; completes, the u consecutive address units at addr2 contain exactly what
 ; the u consecutive address units at addr1 contained before the move.
 ;
+; ---
 ; : MOVE ( addr1 addr2 u --)
 ;   >R 2DUP SWAP DUP R@ + WITHIN R> SWAP IF CMOVE> ELSE CMOVE THEN ;
 
@@ -1890,6 +1938,7 @@ _postpone3: .WORD   EXIT
 ;     state, all processing has been completed, and no ambiguous condition
 ;     exists.
 ;
+; ---
 ; : QUIT  ( --; R: i*x --)
 ;   INITRP  0 STATE !  INIT-ICBS  TIB  ICB ICBLINESTART +  !
 ;   BEGIN
@@ -1954,6 +2003,7 @@ RFETCH:     RSFETCH(H,L)
 ;   definition.  An ambiguous condition exists if RECURSE appears in a
 ;   definition after DOES>.
 ;
+; ---
 ; RECURSE   LATEST @ NFA>CFA , ; IMMEDIATE
 
             LINKTO(RFETCH,1,7,'E',"SRUCER")
@@ -1975,6 +2025,7 @@ RECURSE:    JMP     ENTER
 ; Run-time: ( -- )
 ;   Continue execution at the location given by dest.
 ;
+; ---
 ; REPEAT   POSTPONE AGAIN  POSTPONE THEN ; IMMEDIATE
 
             LINKTO(RECURSE,1,6,'T',"AEPER")
@@ -2047,6 +2098,7 @@ _rshiftDONE:PUSH    H           ; Push the result (HL).
 ;   Return c-addr and u describing a string consisting of the characters
 ;   ccc.  A program shall not alter the returned string.
 ;
+; ---
 ; : S" ( "ccc<quote>" --)
 ;   [CHAR] " PARSE ( caS uS)
 ;   STATE @ 0= IF  DUP 'S"SIZE > ABORT" String too long"
@@ -2071,6 +2123,7 @@ _squote3:   .WORD   SWAP,CMOVE,EXIT
 ;
 ; Convert the number n to the double-cell number d with the same numerical value.
 ;
+; ---
 ; : S>D ( n -- d)   DUP 0< ;
 
             LINKTO(SQUOTE,0,3,'D',">S")
@@ -2085,6 +2138,7 @@ STOD:       JMP     ENTER
 ; numeric output string.  An ambiguous condition exists if SIGN executes
 ; outside of a <# #> delimited number conversion.
 ;
+; ---
 ; : SIGN ( n -- )   0< IF 45 HOLD THEN ;
 
             LINKTO(STOD,0,4,'N',"GIS")
@@ -2101,6 +2155,7 @@ _signDONE:  .WORD   EXIT
 ; exists if n1 is zero or if the quotient lies outside the range of a
 ; single-cell signed integer.
 ;
+; ---
 ; : SM/REM ( d1 n1 -- n2 n3)
 ;   OVER >R  2DUP XOR >R  ( R:remsign quosign)
 ;   ABS >R DABS R>
@@ -2144,6 +2199,7 @@ SPACE:      MVI     A,020h      ; Put the space character in A.
 ;
 ; If n is greater than zero, display n spaces.
 ;
+; ---
 ; : SPACES ( n -- )   DUP IF SPACE 1- THEN DROP ;
 
             LINKTO(SPACE,0,6,'S',"ECAPS")
@@ -2195,7 +2251,8 @@ SWAP:       POP     H           ; Pop x2 into HL.
 ;
 ; Run-time: ( -- )
 ;   Continue execution.
-
+;
+; ---
 ; : THEN   HERE SWAP ! ; IMMEDIATE
 
             LINKTO(SWAP,1,4,'N',"EHT")
@@ -2237,7 +2294,8 @@ _typeDONE:  RESTOREDE
 ; U. [CORE] 6.1.2320 "u-dot" ( u -- )
 ;
 ; Display u in free field format.
-
+;
+; ---
 ; : U. ( u -- )   0 UD.
 
             LINKTO(TYPE,0,2,'.',"U")
@@ -2273,10 +2331,11 @@ ULESSTHAN:  SAVEDE
 ; Multiply u1 by u2, giving the unsigned double-cell product ud.  All
 ; values and arithmetic are unsigned
 ;
+; ---
 ; This is U* copied verbatim from fig-FORTH 8080 v1.3.
 ; The only changes were to save and restore DE in HOLDD.  BC was already
-; getting saved since that is the fig-FORTH Instruction Pointer.  The fig-FORTH
-; comments are unchanged, so replace "IP" with "RSP".
+; getting saved since that is the fig-FORTH Instruction Pointer.  The
+; fig-FORTH comments are unchanged, so replace "IP" with "RSP".
 
             LINKTO(ULESSTHAN,0,3,'*',"MU")
 UMSTAR:     SAVEDE
@@ -2319,7 +2378,7 @@ UMSTAR:     SAVEDE
             ;           (AHL) <- (A) * (DE)
             ;   #BITS =   24      8     16
 MPYX:       LXI     H,0         ; (HL) <- 0 = PARTIAL PRODUCT.LW
-            MVI     C,4	        ; LOOP COUNTER
+            MVI     C,4         ; LOOP COUNTER
 MPYX1:      DAD     H           ; LEFT SHIFT (AHL) 24 BITS
             RAL
             JNC     MPYX2       ; IF NEXT MPLIER BIT = 1
@@ -2342,10 +2401,11 @@ MPYX3:      DCR     C           ; IF NOT LAST MPLIER BIT
 ; and arithmetic are unsigned.  An ambiguous condition exists if u1 is zero
 ; or if the quotient lies outside the range of a single-cell unsigned integer.
 ;
+; ---
 ; This is U/ copied verbatim from fig-FORTH 8080 v1.3.
 ; The only changes were to save and restore DE in HOLDD.  BC was already
-; getting saved since that is the fig-FORTH Instruction Pointer.  The fig-FORTH
-; comments are unchanged, so replace "IP" with "RSP".
+; getting saved since that is the fig-FORTH Instruction Pointer.  The
+; fig-FORTH comments are unchanged, so replace "IP" with "RSP".
 
             LINKTO(UMSTAR,0,6,'D',"OM/MU")
 UMSLASHMOD: SAVEDE
@@ -2433,6 +2493,7 @@ USBAD:      LXI     H,0FFFFh    ; OVERFLOW, RETURN 32BIT -1
 ;   be EXITed.  An ambiguous condition exists if the loop-control parameters
 ;   are unavailable.
 ;
+; ---
 ; UNLOOP  R> DROP R> DROP ;
 
             LINKTO(UMSLASHMOD,0,6,'P',"OOLNU")
@@ -2452,6 +2513,7 @@ UNLOOP:     RSPOP(H,L)
 ;   If all bits of x are zero, continue execution at the location specified
 ;   by dest.
 ;
+; ---
 ; : UNTIL   ['] 0branch COMPILE,  , ; IMMEDIATE
 
             LINKTO(UNLOOP,1,5,'L',"ITNU")
@@ -2471,7 +2533,8 @@ UNTIL:      JMP     ENTER
 ; name Execution: ( -- a-addr )
 ;   a-addr is the address of the reserved cell.  A program is responsible
 ;   for initializing the contents of the reserved cell.
-
+;
+; ---
 ; : VARIABLE ( "<spaces>name" -- )
 ;   CREATE  CFASZ NEGATE ALLOT  195 C, DOVARIABLE ,  0 , ; -- JMP DOVARIABLE
 
@@ -2493,7 +2556,8 @@ VARIABLE:   JMP     ENTER
 ; Run-time: ( x -- )
 ;   If all bits of x are zero, continue execution at the location specified
 ;   by the resolution of orig.
-
+;
+; ---
 ; : WHILE   POSTPONE IF  SWAP ; IMMEDIATE
 
             LINKTO(VARIABLE,1,5,'E',"LIHW")
@@ -2587,7 +2651,7 @@ LTBRACKET:  LXI     H,0
 ;   returned by the compiled phrase "['] X " is the same value returned by
 ;   "' X " outside of compilation state.
 ;
-;
+; ---
 ; : ['] ( "<spaces>name" -- )   '  ['] LIT COMPILE,  , ; IMMEDIATE
 
             LINKTO(LTBRACKET,1,3,']',"\'[")
@@ -2607,7 +2671,8 @@ BRACKETTICK:JMP     ENTER
 ;
 ; Run-time: ( -- char )
 ;   Place char, the value of the first character of name, on the stack.
-
+;
+; ---
 ; : [CHAR] ( "<spaces>name" -- char)   CHAR  ['] LIT COMPILE,  , ; IMMEDIATE
 
             LINKTO(BRACKETTICK,1,6,']',"RAHC[")
@@ -2868,6 +2933,7 @@ ONE:        LXI     H,1
 ;
 ; char is the digit u converted to the values 0-9A-Z.
 ;
+; ---
 ; >DIGIT ( u -- c ) DUP 9 > 7 AND + 48 + ;
 
             LINKTO(ONE,0,6,'T',"IGID>")
@@ -2887,6 +2953,7 @@ _todigit2:  ADI     030h
 ;
 ; Negate d1 if n is negative.
 ;
+; ---
 ; : ?DNEGATE ( d1 n -- d2)   0< IF DNEGATE THEN ;
 
             LINKTO(TODIGIT,0,8,'E',"TAGEND?")
@@ -2900,6 +2967,7 @@ _dnegate1:  .WORD   EXIT
 ;
 ; Negate n1 if n2 is negative.
 ;
+; ---
 ; : ?NEGATE ( n1 n2 -- n3)   0< IF NEGATE THEN ;
 
             LINKTO(QDNEGATE,0,7,'E',"TAGEN?")
@@ -2959,6 +3027,7 @@ _digitqDONE:PUSH    H           ; Push the flag to the stack.
 ; points to either (loop) or (+loop) and is compiled into the end of
 ; the loop.
 ;
+; ---
 ; : END-LOOP ( do-orig pdo-xt)
 ;   COMPILE, ,  'PREVLEAVE @ HERE>CHAIN ; IMMEDIATE
 
@@ -2983,7 +3052,7 @@ ENDLOOP:    JMP     ENTER
 ; to locate the word using the perfect hash table generated at build time.
 ; The _phash subroutine generates two hash values, H and L.  The target
 ; word, if it exists in ROM, will be found at one of two locations: HL or
-; LH.  HL is the more likely value and is searched first.  BC maintains the
+; LH.  HL is the more likely location and is searched first.  BC maintains the
 ; state of the search location.  -1 indicates that the search should use
 ; HL, 0 indicates that the search should use LH, and 1 indicates that the
 ; search failed.
@@ -3135,6 +3204,7 @@ _phashDONE: POP     H           ; Pop the hash values into HL.
 ; The last element in the chain (which could be addr itself) should
 ; contain zero.
 ;
+; ---
 ; HERE>CHAIN ( addr -- )
 ;   BEGIN ?DUP WHILE DUP @ HERE ( a a' h) ROT ! REPEAT ;
 
@@ -3150,6 +3220,7 @@ _htc2:      .WORD   EXIT
 ;
 ; flag is true if and only if the given dictionary word is hidden.
 ;
+; ---
 ; : HIDDEN ( dict-addr -- f )   C@ 64 AND 0<> ;
 
             LINKTO(HERETOCHAIN,0,7,'?',"NEDDIH")
@@ -3199,6 +3270,7 @@ ICB:        LHLD    TICKICB
 ; Initialize all of the Input Control Blocks.  The current Input Control
 ; Block should be configured immediately after executing this word.
 ;
+; ---
 ; : INIT-ICBS ( -- )
 ;   ICBSTART [ MAXICBS 2* 2* 2* ] 0 FILL  ICBSTART TO ICB ;
 
@@ -3209,28 +3281,25 @@ INITICBS:   JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
-; INTERPRET [MFORTH] ( i*x c-addr u -- j*x )
+; INTERPRET [MFORTH] ( i*x -- j*x )
 ;
 ; Interpret the line in the current Input Control Block.
 ;
 ; : INTERPRET ( i*x -- j*x )
 ;   0 >IN !
-;   BEGIN
-;   PARSE-WORD DUP WHILE        -- textadr
-;       (FIND)                  -- ca u 0/1/-1
-;       ?DUP IF                 -- xt 1/-1
-;           1+ STATE @ 0= OR    immed or interp?
+;   BEGIN  PARSE-WORD  DUP WHILE
+;       (FIND) ( ca u 0=notfound | xt 1=imm | xt -1=interp)
+;       ?DUP IF ( xt 1=imm | xt -1=interp);           1+  STATE @ 0=  OR ( xt 2=imm | xt 0=interp)
 ;           IF EXECUTE ELSE COMPILE, THEN
-;       ELSE                    -- textadr
-;           NUMBER?
-;           IF                  -- converted ok
+;       ELSE
+;           NUMBER? IF
 ;               STATE @ IF POSTPONE LITERAL THEN
-;                               -- else leave on stack (not compiling)
+;               -- Interpreting; leave number on stack.
 ;           ELSE
-;               TYPE SPACE [CHAR] ? EMIT CR ABORT  err
+;               TYPE  SPACE  [CHAR] ? EMIT  CR  ABORT
 ;           THEN
 ;       THEN
-;   REPEAT 2DROP ;
+;   REPEAT ( j*x ca u) 2DROP ;
 
             LINKTO(INITICBS,0,9,'T',"ERPRETNI")
 INTERPRET:  JMP     ENTER
@@ -3280,6 +3349,7 @@ LIT:        LHLX            ; Read constant from instruction stream.
 ; cfa-addr is the Code Field Address for the word whose Name Field Address
 ; is nfa-addr.
 ;
+; ---
 ; : NFA>CFA ( nfa-addr -- cfa-addr)   NFATOCFASZ + ;
 
             LINKTO(LIT,0,7,'A',"FC>AFN")
@@ -3295,6 +3365,7 @@ NFATOCFA:   POP     H
 ; lfa-addr is the Link Field Address for the word whose Name Field Address
 ; is nfa-addr.
 ;
+; ---
 ; : NFA>LFA ( nfa-addr -- lfa-addr)   1+ ;
 
             LINKTO(NFATOCFA,0,7,'A',"FL>AFN")
@@ -3311,6 +3382,7 @@ NFATOLFA:   POP     H
 ; the radix in BASE.  The number and -1 is returned if the conversion
 ; was successful, otherwise 0 is returned.
 ;
+; ---
 ; : NUMBER? ( ca u -- ca u 0 | n -1 )
 ;   SIGN? >R  2DUP 0 0 2SWAP  >NUMBER  ( ca u ud ca2 u2)
 ;   IF DROP 2DROP  R> DROP  0 ELSE
@@ -3372,6 +3444,7 @@ REVEAL:     LHLD    TICKLATEST
 ; the radix in BASE.  The number and -1 is returned if the conversion
 ; was successful, otherwise 0 is returned.
 ;
+; ---
 ; : SIGN? ( ca1 u1 -- ca2 u2 f )
 ;   OVER  C@  DUP [CHAR] - =  OVER [CHAR] + = OR  IF
 ;       [CHAR] - = IF -1 ELSE 0 THEN  >R 1 /STRING R>
@@ -3393,6 +3466,7 @@ _signq4:    .WORD   EXIT
 ;
 ; Multiply ud1 by u1, giving the unsigned double-cell product ud2.
 ;
+; ---
 ; UD* ( ud1 u1 -- ud2)   DUP >R UM* DROP  SWAP R> UM* ROT + ;
 
             LINKTO(SIGNQ,0,3,'*',"DU")
@@ -3406,7 +3480,8 @@ UDSTAR:     JMP     ENTER
 ; UD. [MFORTH] "u-d-dot" ( ud -- )
 ;
 ; Display ud in free field format.
-
+;
+; ---
 ; : UD. ( ud -- )   <# #S #> TYPE SPACE ;
 
             LINKTO(UDSTAR,0,3,'.',"DU")
@@ -3420,6 +3495,7 @@ UDDOT:      JMP     ENTER
 ;
 ; Divide ud1 by u1 giving the quotient ud2 and the remainder n.
 ;
+; ---
 ; UD/MOD ( ud1 u1 -- n ud2 )   >R 0 R@ UM/MOD  R> SWAP >R UM/MOD R> ;
 
             LINKTO(UDDOT,0,6,'D',"OM/DU")

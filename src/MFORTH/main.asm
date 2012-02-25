@@ -300,7 +300,7 @@ FCBSTART:   .EQU    ALTBGN + 128; Start of the 8, 8-byte File Control Blocks.
 
 
 ; ======================================================================
-; System-provides user variables
+; System-provided user variables
 ;
 ; User variable offsets are the absolute offset into the Task Page and
 ; are not an index or count or anything like that.  In other words, the
@@ -808,7 +808,7 @@ _latest         .EQU    LAST_PROFILER
 ; ======================================================================
 
 #IFNDEF PHASH
-; Temporarily store _latest at 07FFD for use by phashgen.exe.
+; Temporarily store _latest at 07FFE for use by phashgen.exe.
             .ORG    07FFEh
             .WORD   _latest-NFATOCFASZ
 #ELSE

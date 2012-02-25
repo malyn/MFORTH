@@ -137,6 +137,7 @@ _neqDONE:   PUSH    H           ; Push the flag to the stack.
 ;   control flow words are used, any program code after AGAIN will not
 ;   be executed.
 ;
+; ---
 ; : AGAIN   ['] branch COMPILE,  , ; IMMEDIATE
 
             LINKTO(NOTEQUALS,1,5,'N',"IAGA")
@@ -158,6 +159,7 @@ AGAIN:      JMP     ENTER
 ;   Return c-addr, a counted string consisting of the characters ccc.
 ;   A program shall not alter the returned string.
 ;
+; ---
 ; : C" ( "ccc<quote>" --)   ['] (C") COMPILE,
 ;   [CHAR] " PARSE  DUP C,  HERE OVER ALLOT SWAP CMOVE ;
 
@@ -221,6 +223,7 @@ NIP:        POP     H           ; Pop x2 into HL.
 ; c-addr is the address of a transient region that can be used to hold
 ; data for intermediate processing.
 ;
+; ---
 ; : PAD ( -- c-addr)   HERE  PADOFFSET +  TASK 'FIRSTTASK @ -  8 LSHIFT  + ;
 
             LINKTO(NIP,0,3,'D',"AP")
@@ -283,7 +286,7 @@ PICK:       POP     H           ; Get u into HL,
 ; Identifies the input source as follows:
 ;
 ;   =================================
-;   SOURCE-ID	Input source
+;   SOURCE-ID   Input source
 ;   ---------------------------------
 ;    fileid     Text file "fileid"
 ;      -1       String (via EVALUATE)

@@ -63,6 +63,7 @@ BIN:        NEXT
 ; Close the file identified by fileid.  ior is the implementation-defined
 ; I/O result code.
 ;
+; ---
 ; : CLOSE-FILE ( fileid -- ior)
 ;   FILEID>FCB? ?DUP IF EXIT THEN
 ;   FCBADDR +  0 SWAP !  IOROK ;
@@ -116,6 +117,7 @@ DELETEFILE: JMP     ENTER
 ; is the implementation-defined I/O result code.  ud is undefined if ior is
 ; non-zero.
 ;
+; ---
 ; : FILE-POSITION ( fileid -- ud ior)
 ;   FILEID>FCB? ?DUP IF 0 SWAP EXIT THEN
 ;   DUP FCBPOS + @  SWAP FCBADDR + @  -  IOROK ;
@@ -135,6 +137,7 @@ _filepos1:  .WORD   DUP,LIT,FCBPOS,PLUS,FETCH,SWAP,LIT,FCBADDR,PLUS,FETCH
 ; affect the value returned by FILE-POSITION.  ud is undefined if ior is
 ; non-zero.
 ;
+; ---
 ; : FILE-SIZE ( fileid -- ud ior)
 ;   FILEID>FCB? ?DUP IF 0 SWAP EXIT THEN
 ;   DUP FCBEND + @  SWAP FCBADDR + @  -  IOROK ;
@@ -240,6 +243,7 @@ _included1: .WORD   INCLUDEFILE,EXIT
 ; Otherwise, ior is the implementation-defined I/O result code and fileid
 ; is undefined.
 ;
+; ---
 ; : OPEN-FILE ( c-addr u fam -- fileid ior)
 ;   R/O <> IF 2DROP 0 IORRDONLY EXIT THEN
 ;   FIND-FILE ?DUP IF 0 SWAP EXIT THEN  NEW-FCB >R  ( file-addr file-len  R:fcb)
@@ -502,6 +506,7 @@ FCBGENNUM:  .EQU    6           ; Offset to generation number.
 ; input device.  The first FCB, when its generation number is zero, would
 ; otherwise produce a fileid of zero.
 ;
+; ---
 ; : FCB>FILEID ( fcb-addr -- fileid)
 ;   DUP FCBGENNUM + C@ 8 LSHIFT  SWAP FCBSTART - 1+  OR ;
 
@@ -517,6 +522,7 @@ FCBTOFILEID:JMP     ENTER
 ; Return the address of the File Control Block for the given fileid.  An
 ; ambiguous condition exists if fileid is invalid.
 ;
+; ---
 ; : FILEID>FCB ( fileid -- fcb-addr)   255 AND 1- FCBSTART + ;
 
             LINKTO(FCBTOFILEID,0,10,'B',"CF>DIELIF")
@@ -530,6 +536,7 @@ FILEIDTOFCB: JMP    ENTER
 ; Return the address of the File Control Block for the given fileid, or
 ; ior if the fileid is invalid.
 ;
+; ---
 ; : FILEID>FCB? ( fileid -- ior | fcb-addr 0 )
 ;   DUP 8 RSHIFT  SWAP 255 AND ( gen fcboff)
 ;   DUP 0=  OVER [ MAXFCBS 2* 2* 2* ] >  OR IF 2DROP IORBADFILEID EXIT THEN
@@ -559,6 +566,7 @@ _fileidtofcbq3:.WORD LIT,IOROK,EXIT
 ; the file is found the address and length of the file and 0 will be
 ; returned, otherwise an ior will be returned.
 ;
+; ---
 ; : FIND-FILE ( ca u -- ior | fa fl 0)
 ;   DUP 6 > IF 2DROP IORFNF EXIT THEN
 ;   TUCK  FILNAME SWAP MOVE
@@ -584,6 +592,7 @@ _findfile3: .WORD   LIT,0FC93h,LIT,6,PLUS
 ; Initialize all of the File Control Blocks.  This has the effect of
 ; "closing" any open files.
 ;
+; ---
 ; : INIT-FCBS ( -- )   FCBSTART [ MAXFCBS 2* 2* 2* ] 0 FILL ;
 
             LINKTO(FINDFILE,0,9,'S',"BCF-TINI")
@@ -598,6 +607,7 @@ INITFCBS:   JMP     ENTER
 ; Control Block.  Return 0 if the system has run out of File Control
 ; Blocks.
 ;
+; ---
 ; : NEWFCB ( -- fcb-addr)
 ;   [ MAXFCBS 2* 2* 2* ] LITERAL 0 DO
 ;   FCBSTART I +  DUP FCBADDR + @ 0= IF UNLOOP EXIT THEN  DROP  8 +LOOP
