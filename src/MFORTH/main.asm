@@ -30,7 +30,7 @@
 ; ======================================================================
 
 MFORTH_MAJOR    .EQU    1
-MFORTH_MINOR    .EQU    0
+MFORTH_MINOR    .EQU    1
 ;MFORTH_CHANGE  .EQU    Supplied on the TASM command line.
 
 
