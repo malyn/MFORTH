@@ -170,6 +170,14 @@ MFORTH_MINOR    .EQU    0
 ;   .           Parameter            .
 ;   .             Field              .
 ;   . . . . . . . .  . . . . . . . . .
+;
+;
+; Word List:
+;
+;   An MFORTH wid is a pointer to a word list (HERE, in the case of word
+;   lists created by WORDLIST).  A word list is a single cell that is
+;   the equivalent of LATEST for that word list.  The value at the word
+;   list is updated as new words are added to the word list.
 
 
 
@@ -246,6 +254,7 @@ PADSIZE:    .EQU    256         ; Size of each task's PAD buffer.
 
 MAXICBS:    .EQU    8           ; Maximum number of active input sources.
 MAXFCBS:    .EQU    8           ; Maximum number of files open at one time.
+MAXSOES:    .EQU    8           ; Max. number of word lists in the search order.
 
 
 
@@ -278,7 +287,7 @@ INTD:       .EQU    ALTBGN + 22
 
 DP:         .EQU    ALTBGN + 24 ; Data Pointer.
 BOPSTK:     .EQU    ALTBGN + 26 ; Initial value of SP on entry to MFORTH.
-TICKLATEST: .EQU    ALTBGN + 28 ; Pointer to the latest word added to the dict.
+TICKCURRENT: .EQU   ALTBGN + 28 ; Pointer to the compilation word list.
 TICKSTATE:  .EQU    ALTBGN + 30 ; Compilation-state flag.
 TICKTIB:    .EQU    ALTBGN + 32 ; Terminal Input Buffer pointer.
 TICKHLD:    .EQU    ALTBGN + 34 ; Pictured Numeric Output hold pointer.
@@ -292,10 +301,13 @@ TICKICB:    .EQU    ALTBGN + 48 ; Address of the current Input Control Block.
 PROFILING:  .EQU    ALTBGN + 50 ; Non-zero if the profiler is on.
 TICKTICKS:  .EQU    ALTBGN + 52 ; (double) Number of ticks (4ms) since start.
 SAVEB:      .EQU    ALTBGN + 56 ; DE is saved here when used as a temporary.
-; 6 bytes free.
+FORTHWL:    .EQU    ALTBGN + 58 ; FORTH word list.
+ASSEMBLERWL:.EQU    ALTBGN + 60 ; ASSEMBLER word list.
+; 2 bytes free.
 ICBSTART:   .EQU    ALTBGN + 64 ; Start of the 8, 8-byte Input Control Blocks.
 FCBSTART:   .EQU    ALTBGN + 128; Start of the 8, 8-byte File Control Blocks.
-; 128 bytes free.
+SOESTART:   .EQU    ALTBGN + 192; Start of the 8, 2-byte Search Order Entries.
+; 112 bytes free.
 
 
 
@@ -674,9 +686,16 @@ _init1:     LDAX    D           ; Load value from [DE]
             DAD     SP          ; ..OS stack pointer on entry into MFORTH
             SHLD    BOPSTK      ; ..and store it in in BOPSTK.
             
-            ; Initialize LATEST.
-            LXI     H,_latest-NFATOCFASZ
-            SHLD    TICKLATEST
+            ; Initialize the system word lists.
+            LXI     H,_latestFORTH-NFATOCFASZ
+            SHLD    FORTHWL
+            LXI     H,_latestASSEMBLER-NFATOCFASZ
+            SHLD    ASSEMBLERWL
+
+            ; Make the FORTH word list the current compilation word
+            ; list; ABORT will initialize the default search order.
+            LXI     H,FORTHWL
+            SHLD    TICKCURRENT
             
             ; Four USER variables are currently in use (SavedSP, Base, B, Bend).
             LXI     H,NUMUSERVARS
@@ -732,7 +751,7 @@ _init1:     LDAX    D           ; Load value from [DE]
 
 
 ; ======================================================================
-; MFORTH Kernel and Supported Wordsets
+; MFORTH Kernel and FORTH Word List
 ; ======================================================================
 
 ; Kernel routines and macros.
@@ -757,7 +776,13 @@ LINK_FACILITYEXT .EQU   LAST_FACILITY
 LINK_FILE       .EQU    LAST_FACILITYEXT
 #include "answords/file.asm"
 
-LINK_STRING     .EQU    LAST_FILE
+LINK_SEARCH     .EQU    LAST_FILE
+#include "answords/search.asm"
+
+LINK_SEARCHEXT  .EQU    LAST_SEARCH
+#include "answords/search-ext.asm"
+
+LINK_STRING     .EQU    LAST_SEARCHEXT
 #include "answords/string.asm"
 
 LINK_TOOLS      .EQU    LAST_STRING
@@ -777,13 +802,25 @@ LINK_TASK       .EQU    LAST_MFORTH
 #include "mforthwords/task.asm"
 
 #IFNDEF PROFILER
-_latest         .EQU    LAST_TASK
+_latestFORTH    .EQU    LAST_TASK
 #ELSE
 LINK_PROFILER   .EQU    LAST_TASK
 #include "mforthwords/profiler.asm"
 
-_latest         .EQU    LAST_PROFILER
+_latestFORTH    .EQU    LAST_PROFILER
 #ENDIF
+
+
+
+; ======================================================================
+; Additional Word Lists
+; ======================================================================
+
+; ASSEMBLER Word List
+LINK_ASSEMBLER  .EQU    NFATOCFASZ
+#include "mforthwords/assembler.asm"
+
+_latestASSEMBLER .EQU   LAST_ASSEMBLER
 
 
 
@@ -811,9 +848,9 @@ _latest         .EQU    LAST_PROFILER
 ; ======================================================================
 
 #IFNDEF PHASH
-; Temporarily store _latest at 07FFE for use by phashgen.exe.
+; Temporarily store _latestFORTH at 07FFE for use by phashgen.exe.
             .ORG    07FFEh
-            .WORD   _latest-NFATOCFASZ
+            .WORD   _latestFORTH-NFATOCFASZ
 #ELSE
 ; phash.asm already generated.
 #include "phash.asm"

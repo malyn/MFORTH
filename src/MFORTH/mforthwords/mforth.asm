@@ -96,13 +96,28 @@ TWONIP:     SAVEDE
 
 
 ; ----------------------------------------------------------------------
+; 8* [MFORTH] "eight-star" ( x1 -- x2 )
+;
+; x2 is the result of shifting x1 three bits toward the most-significant
+; bit, filling the vacated least-significant bit with zero.
+
+            LINKTO(TWONIP,0,2,'*',"8")
+EIGHTSTAR:  POP     H           ; Pop x1.
+            DAD     H           ; Shift
+            DAD     H           ; ..x1
+            DAD     H           ; ..three times.
+            PUSH    H           ; Push the result onto the stack.
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; GET-XY [MFORTH] "get-x-y" ( -- u1 u2 )
 ;
 ; Return the current cursor position (column u1, row u2) from the
 ; current input device, the upper left corner of which is column zero,
 ; row zero.
 
-            LINKTO(TWONIP,0,6,'Y',"X-TEG")
+            LINKTO(EIGHTSTAR,0,6,'Y',"X-TEG")
 GETXY:      MVI     H,0         ; Initialize H with zero.
             LDA     0F63Ah      ; Get the column into A,
             DCR     A           ; ..subtract one,
@@ -347,6 +362,60 @@ TICKSTOMS:  JMP     ENTER
 ;   TICKS 2>R  EXECUTE  TICKS 2R>  D- ;
 
             LINKTO(TICKSTOMS,0,13,'E',"TUCEXE-DEMIT")
-LAST_MFORTH:
 TIMEDEXECUTE:JMP    ENTER
             .WORD   TICKS,TWOTOR,EXECUTE,TICKS,TWORFROM,DMINUS,EXIT
+
+
+; ----------------------------------------------------------------------
+; VOCABULARY [MFORTH] ( "<spaces>name" -- )
+;
+; Skip leading space delimiters.  Parse name delimited by a space.  Create
+; a definition for name with the execution semantics defined below.
+;
+; name is referred to as a "word list".
+;
+; name Execution: ( -- )
+;   Replace the first word list in the search order with name.
+;
+; ---
+; : VOCABULARY ( "<spaces>name" -- )
+;   CREATE WORDLIST DOES> SOESTART ! ;
+
+            LINKTO(TIMEDEXECUTE,0,10,'Y',"RALUBACOV")
+VOCABULARY: JMP     ENTER
+            .WORD   CREATE,LIT,-CFASZ,ALLOT,LIT,195,CCOMMA,LIT,pvocabulary,COMMA
+            .WORD   WORDLIST
+            .WORD   EXIT
+pvocabulary:CALL    DODOES
+            .WORD   LIT,SOESTART,STORE,EXIT
+
+
+; ----------------------------------------------------------------------
+; [HEX] [MFORTH] "bracket-hex"
+;
+; Interpretation:
+;   Interpretation semantics for this word are undefined.
+;
+; Compilation: ( "<spaces>hexnum" -- )
+;   Skip leading space delimiters.  Parse hexnum, a base 16 number
+;   delimited by a space.  Append the run-time semantics given below to
+;   the current definition.
+;
+; Run-time: ( -- u )
+;   Place u, the value of hexnum, on the stack.
+;
+; ---
+; : [HEX] ( "<spaces>name" -- u)
+;   BASE @  HEX PARSE-WORD  ( savedbase ca u)
+;   NUMBER? IF ['] LIT COMPILE, , BASE ! EXIT THEN
+;   ABORT" Not a hex number" ; IMMEDIATE
+
+            LINKTO(VOCABULARY,1,5,']',"XEH[")
+LAST_MFORTH:
+BRACKETHEX: JMP     ENTER
+            .WORD   BASE,FETCH,HEX,PARSEWORD
+            .WORD   NUMBERQ,zbranch,_brackethex1
+            .WORD   LIT,LIT,COMPILECOMMA,COMMA,BASE,STORE,EXIT
+_brackethex1:.WORD  PSQUOTE,16
+            .BYTE   "Not a hex number"
+            .WORD   TYPE,ABORT

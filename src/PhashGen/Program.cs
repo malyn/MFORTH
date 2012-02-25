@@ -1,6 +1,6 @@
 ﻿// ---------------------------------------------------------------------
 // <copyright file="Program.cs" company="Michael Alyn Miller">
-// Copyright (c) 2009-2010, Michael Alyn Miller (malyn@strangeGizmo.com).
+// Copyright (c) 2009-2011, Michael Alyn Miller (malyn@strangeGizmo.com).
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -55,7 +55,7 @@ namespace PhashGen
         /// most words at their first hash location (which provides a
         /// marginal increase to lookup performance in MFORTH).
         /// </summary>
-        private const int HashTableRandomSeed = 4562;
+        private static int HashTableRandomSeed = 135960;
 
         /// <summary>
         /// The size of the hash table; this value needs to be a power
@@ -63,7 +63,7 @@ namespace PhashGen
         /// words in the MFORTH ROM without causing a high number of
         /// hash collisions.
         /// </summary>
-        private const int HashTableSize = 512;
+        private const int HashTableSize = 1024;
 
         /// <summary>
         /// The mask value used to reduce the 16-bit hash value down to
@@ -171,10 +171,15 @@ namespace PhashGen
                 (w) => HashName(w.Name, hashFunc2, hashFunc1, HashMask));
 
             // Generate the hash table.
+#if FINDING_OPTIMAL_HASH_SEED
+            int minValuesAtSecondLocation = int.MaxValue;
+#endif
             for (;;)
             {
+#if !FINDING_OPTIMAL_HASH_SEED
                 // Display a progress dot.
                 Console.Write(".");
+#endif
 
                 // Add all of the words to our hash table; assume that
                 // we will be successful.
@@ -188,6 +193,7 @@ namespace PhashGen
                     }
                 }
 
+#if !FINDING_OPTIMAL_HASH_SEED
                 // We're done if all of the words were added to the
                 // table.
                 if (haveCompleteTable)
@@ -196,9 +202,33 @@ namespace PhashGen
                 }
 
                 // We failed to generate a complete hash table; shuffle
-                // the hash functions and try again.
+                // the hash functions, clear the table, and try again.
                 phf1.ShuffleAuxilliaryTable(random);
                 phf2.ShuffleAuxilliaryTable(random);
+                hashTable.Clear();
+#else
+                // Print out the results if this seed produced better
+                // results than the previous best seed.
+                if (haveCompleteTable
+                    && hashTable.NumValuesStoredAtSecondHash < minValuesAtSecondLocation)
+                {
+                    Console.WriteLine(
+                        "Seed: {0}; 1st: {1}; 2nd: {2}",
+                        HashTableRandomSeed,
+                        hashTable.NumValuesStoredAtFirstHash,
+                        hashTable.NumValuesStoredAtSecondHash);
+                    minValuesAtSecondLocation = hashTable.NumValuesStoredAtSecondHash;
+                }
+
+                // Generate a new seed and re-create all of the hash
+                // functions and tables.
+                random = new Random(++HashTableRandomSeed);
+                hashFunc1 = phf1 = new PearsonHashFunction(random);
+                hashFunc2 = phf2 = new PearsonHashFunction(random);
+                hashTable = new CuckooHashTable<Word>(
+                    (w) => HashName(w.Name, hashFunc1, hashFunc2, HashMask),
+                    (w) => HashName(w.Name, hashFunc2, hashFunc1, HashMask));
+#endif
             }
 
             // Ensure that all of the words in the ROM were added to the

@@ -30,13 +30,52 @@
 ; ======================================================================
 
 ; ----------------------------------------------------------------------
+; ASSEMBLER [TOOLS EXT] 15.6.2.0740 ( -- )
+;
+; Replace the first word list in the search order with the ASSEMBLER
+; word list.
+
+            LINKTO(LINK_TOOLSEXT,0,9,'R',"ELBMESSA")
+ASSEMBLER:  JMP     ENTER
+            .WORD   LIT,ASSEMBLERWL,LIT,SOESTART,STORE,EXIT
+
+
+; ----------------------------------------------------------------------
 ; BYE [TOOLS EXT] 15.6.2.0830 ( -- )
 ;
 ; Return control to the host operating system, if any.
 
-            LINKTO(LINK_TOOLSEXT,0,3,'E',"YB")
-LAST_TOOLSEXT:
+            LINKTO(ASSEMBLER,0,3,'E',"YB")
 BYE:        LHLD    BOPSTK      ; Load the SP on entry into MFORTH
             SPHL                ; ..and restore that SP.
             CALL    STDCALL     ; Call the
             .WORD   5797h       ; ..main menu routine (never returns).
+
+
+; ----------------------------------------------------------------------
+; CODE [TOOLS EXT] 15.6.2.0930 ( "<spaces>name" -- )
+;
+; Skip leading space delimiters.  Parse name delimited by a space.
+; Create a definition for name, called a "code definition", with the
+; execution semantics defined below.  
+;
+; Subsequent characters in the parse area typically represent source
+; code in a programming language, usually some form of assembly
+; language.  Those characters are processed in an implementation-defined
+; manner, generating the corresponding machine code.  The process
+; continues, refilling the input buffer as needed, until an
+; implementation-defined ending sequence is processed. 
+;
+;   name Execution: ( -- a-addr )
+;       Execute the machine code sequence that was generated following
+;       CODE.
+;
+; ---
+; : CODE ( "<spaces>name" -- )
+;   CREATE  CFASZ NEGATE ALLOT  ALSO ASSEMBLER ;
+
+            LINKTO(BYE,0,4,'E',"DOC")
+LAST_TOOLSEXT:
+CODE:       JMP     ENTER
+            .WORD   CREATE,LIT,-CFASZ,ALLOT,ALSO,ASSEMBLER
+            .WORD   EXIT
