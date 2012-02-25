@@ -112,14 +112,14 @@ _dumpline2: .WORD   DUP,I,PLUS,CFETCH,EMITVALID,ploop,_dumpline2
 ;
 ; : WORDS ( -- )
 ;   LATEST @  BEGIN  DUP HIDDEN? 0=  IF SPACE DUP .NAME THEN
-;   1+ @  DUP 0= UNTIL DROP ;
+;   NFA>LFA @  DUP 0= UNTIL DROP ;
 
             LINKTO(DUMP,0,5,'S',"DROW")
 WORDS:      JMP     ENTER
             .WORD   LATEST,FETCH
 _words1:    .WORD   DUP,HIDDENQ,ZEROEQUALS,zbranch,_words2
             .WORD   SPACE,DUP,DOTNAME
-_words2:    .WORD   ONEPLUS,FETCH,DUP,ZEROEQUALS,zbranch,_words1
+_words2:    .WORD   NFATOLFA,FETCH,DUP,ZEROEQUALS,zbranch,_words1
             .WORD   DROP,EXIT
 
 
@@ -129,12 +129,12 @@ _words2:    .WORD   ONEPLUS,FETCH,DUP,ZEROEQUALS,zbranch,_words1
 ; ======================================================================
 
 ; ----------------------------------------------------------------------
-; .NAME [MFORTH] "dot-name" ( dict-addr -- )
+; .NAME [MFORTH] "dot-name" ( nfa-addr -- )
 ;
-; Display the name of the dictionary entry pointed to by dict-addr (which
+; Display the name of the dictionary entry pointed to by nfa-addr (which
 ; points to the length field).
 ;
-; : .NAME ( dict-addr -- )
+; : .NAME ( nfa-addr -- )
 ;   BEGIN  1- DUP C@  DUP 127 AND EMIT  128 AND UNTIL DROP ;
 
             LINKTO(WORDS,0,5,'E',"MAN.")

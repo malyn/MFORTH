@@ -93,12 +93,31 @@
 ; DE is the Instruction Pointer and an undocumented 8085 opcode is used
 ; to transfer the location pointed to be DE into HL, the Word pointer.
 
+#IFNDEF PROFILER
 ;NEXT:      LHLX                ;[1.10] (IP) -> W
 ;           INX     D           ;[1. 5] IP+1 -> IP
 ;           INX     D           ;[1. 5] IP+1 -> IP
 ;           PCHL                ;[1. 5] JMP W
 ;                               ;[4.25]
 #DEFINE     NEXT    LHLX\ INX D\ INX D\ PCHL
+#ELSE
+PROFILENEXT:LHLD    PROFILING   ; Don't increment the Execution Count
+            MOV     A,L         ; ..if the profiling
+            ORA     H           ; ..flag
+            JZ      _profnext1  ; ..is zero.
+            LHLX                ; (IP) -> W
+            DCX     H           ; Decrement HL
+            DCX     H           ; ..to the low byte of the Execution Count.
+            INR     M           ; Increment the low byte of the count
+            JNZ     _profnext1  ; ..and skip the high byte if we didn't wrap.
+            INX     H           ; Increment to the high byte of the count.
+            INR     M           ; Increment the high byte of the count.
+_profnext1: LHLX                ; (IP) -> W
+            INX     D           ; IP+1 -> IP
+            INX     D           ; IP+1 -> IP
+            PCHL                ; JMP W
+#DEFINE     NEXT    JMP PROFILENEXT
+#ENDIF
 
 
 ; ----------------------------------------------------------------------
@@ -106,7 +125,7 @@
 
 DOCOLON:
 ENTER:      RSPUSH(D,E)         ;[6.34]
-            LDEH    3           ;[2.10] W+3 -> IP (3=size of JMP enter in the CFA)
+            LDEH    CFASIZE     ;[2.10] W+CFASIZE -> IP
             NEXT                ;[4.25]
                                 ;[12.69]
 
@@ -114,9 +133,7 @@ ENTER:      RSPUSH(D,E)         ;[6.34]
 ; ----------------------------------------------------------------------
 ; DODOES for use by high-level CREATE..DOES> definitions
 
-DODOES:     INX     H           ; Skip over
-            INX     H           ; ..the
-            INX     H           ; ..CFA so that HL points at the PFA.
+DODOES:     SKIPCFA             ; Skip over the CFA so that HL points to PFA.
             XTHL                ; Swap PFA with the address of the high-level
                                 ; ..word that appears after DOES>.  That addr
                                 ; ..is on the stack because we CALL DODOES.
@@ -129,9 +146,7 @@ DODOES:     INX     H           ; Skip over
 ; DOCREATE and DOVARIABLE for use by high-level CREATE and VARIABLE definitions.
 
 DOCREATE:
-DOVARIABLE: INX     H           ; Skip over
-            INX     H           ; ..the
-            INX     H           ; ..CFA
+DOVARIABLE: SKIPCFA             ; Skip over the CFA so that HL points to PFA.
             PUSH    H           ; Push PFA to the stack.
             NEXT
 
@@ -139,9 +154,7 @@ DOVARIABLE: INX     H           ; Skip over
 ; ----------------------------------------------------------------------
 ; DOCONSTANT for use by high-level CONSTANT definitions.
 
-DOCONSTANT: INX     H           ; Skip over
-            INX     H           ; ..the
-            INX     H           ; ..CFA.
+DOCONSTANT: SKIPCFA             ; Skip over the CFA so that HL points to PFA.
             MOV     A,M         ; Get the low byte of the constant in A,
             INX     H           ; ..then increment to the high byte,
             MOV     H,M         ; ..get the high byte into H,
@@ -153,9 +166,7 @@ DOCONSTANT: INX     H           ; Skip over
 ; ----------------------------------------------------------------------
 ; DOUSER for use by high-level USER variables.
 
-DOUSER:     INX     H           ; Skip over
-            INX     H           ; ..the
-            INX     H           ; ..CFA
+DOUSER:     SKIPCFA             ; Skip over the CFA so that HL points to PFA.
             MOV     L,M         ; Put USER variable offset into L.
             MOV     H,B         ; Put Task Page into H.
             PUSH    H           ; Push USER variable address onto stack.
@@ -181,4 +192,8 @@ DOUSER:     INX     H           ; Skip over
 ; Notice that the name is in reverse order and that the last character is
 ; specified as a separate byte.
 
-#DEFINE     LINKTO(prev,isimm,len,lastchar,revchars) .BYTE 10000000b|lastchar,revchars\ .BYTE (isimm<<7)|len\ .WORD prev-3
+#IFNDEF PROFILER
+#DEFINE     LINKTO(prev,isimm,len,lastchar,revchars) .BYTE 10000000b|lastchar,revchars\ .BYTE (isimm<<7)|len\ .WORD prev-HEADERSIZE
+#ELSE
+#DEFINE     LINKTO(prev,isimm,len,lastchar,revchars) .BYTE 10000000b|lastchar,revchars\ .BYTE (isimm<<7)|len\ .WORD prev-HEADERSIZE\ .WORD 0
+#ENDIF

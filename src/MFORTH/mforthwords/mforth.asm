@@ -48,13 +48,16 @@ DASHROT:    SAVEDE
 ; ----------------------------------------------------------------------
 ; .VER [MFORTH] "dot-ver" ( -- )
 ;
-; Display the MFORTH version as a string of 15 characters ("MFORTH 1.0.0000").
+; Display the MFORTH version as a string of 16 characters ("MFORTH 1.0.0000 ").
+; The space in the 16th position will be replaced with a "P" if this is a
+; build that includes the profiler.
 ;
 ; : .VER ( --)
 ;   ." MFORTH v"
 ;   MFORTH_MAJOR [CHAR] 0 + EMIT  [CHAR] . EMIT
 ;   MFORTH_MINOR [CHAR] 0 + EMIT  [CHAR] . EMIT
-;   BASE @  HEX  MFORTH_CHANGE 0 <# # # # # #> TYPE  BASE ! ;
+;   BASE @  HEX  MFORTH_CHANGE 0 <# # # # # #> TYPE  BASE !
+;   [ PROFILER ] [IF] [CHAR] P EMIT [ELSE] SPACE [THEN] ;
 
             LINKTO(DASHROT,0,4,'R',"EV.")
 DOTVER:     JMP     ENTER
@@ -65,7 +68,13 @@ DOTVER:     JMP     ENTER
             .WORD   LIT,MFORTH_MINOR,LIT,'0',PLUS,EMIT,LIT,'.',EMIT
             .WORD   BASE,FETCH,HEX,LIT,MFORTH_CHANGE,ZERO
             .WORD   LESSNUMSIGN,NUMSIGN,NUMSIGN,NUMSIGN,NUMSIGN,NUMSIGNGRTR
-            .WORD   TYPE,BASE,STORE,EXIT
+            .WORD   TYPE,BASE,STORE
+#IFDEF PROFILER
+            .WORD   LIT,'P',EMIT
+#ELSE
+            .WORD   SPACE
+#ENDIF
+            .WORD   EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -94,7 +103,7 @@ TWONIP:     SAVEDE
 ; the infinite text interpreter loop).
 ;
 ; : COLD ( i*x --; R: j*x --)
-;   PAGE  .VER 3 SPACES ." (C)Michael Alyn Miller"
+;   PAGE  .VER 2 SPACES ." (C)Michael Alyn Miller"
 ;   INS-ROMTRIG INIT-FCBS ABORT ;
 ;
 ; ABORT should never return, but we HALT anyway just in case someone
@@ -102,7 +111,7 @@ TWONIP:     SAVEDE
 
             LINKTO(TWONIP,0,4,'D',"LOC")
 COLD:       JMP     ENTER
-            .WORD   PAGE,DOTVER,LIT,3,SPACES
+            .WORD   PAGE,DOTVER,LIT,2,SPACES
             .WORD   PSQUOTE,22
             .BYTE   "(C)Michael Alyn Miller"
             .WORD   TYPE,INSROMTRIG,INITFCBS,ABORT
@@ -186,6 +195,7 @@ _insromtrig1:.WORD  TOB,LIT,240,BSTOREPLUS,LIT,255,BSTOREPLUS,LIT,255,BSTOREPLUS
             .WORD   B,SWAP,MOVE,BL,BSTOREPLUS,BL,BSTOREPLUS
             .WORD   EXIT
 
+            LINKTO(INSROMTRIG,0,12,'G',"IRTMOR-DNIF")
 FINDROMTRIG:JMP     ENTER
             .WORD   LIT,0F9BAh-11
 _findromtrig1:.WORD NXTDIR,DUP,zbranch,_findromtrig3
@@ -194,6 +204,7 @@ _findromtrig1:.WORD NXTDIR,DUP,zbranch,_findromtrig3
 _findromtrig2:.WORD branch,_findromtrig1
 _findromtrig3:.WORD EXIT
 
+            LINKTO(FINDROMTRIG,0,6,'R',"IDTXN")
 NXTDIR:     POP     H           ; Get the entry prior to the start position.
             CALL    STDCALL     ; Call the
             .WORD   020D5h      ; .."NXTDIR" routine.
@@ -203,6 +214,7 @@ _nxtdirZERO:LXI     H,0         ; Put zero in HL.
 _nxtdirFOUND:PUSH   H           ; Push the location (or zero) to the stack.
             NEXT
 
+            LINKTO(NXTDIR,0,6,'R',"IDERF")
 FREDIR:     PUSH    B           ; Save BC (corrupted by FREDIR).
             CALL    STDCALL     ; Call the
             .WORD   020ECh      ; .."FREDIR" routine.
@@ -213,12 +225,33 @@ FREDIR:     PUSH    B           ; Save BC (corrupted by FREDIR).
 
 
 ; ----------------------------------------------------------------------
+; LCD [MFORTH] "l-c-d" ( -- )
+;
+; Select the LCD display as the output device.
+
+            LINKTO(FREDIR,0,3,'D',"CL")
+LCD:        CALL    STDCALL     ; Call the
+            .WORD   04B92h      ; .."Reinitialize back to LCD" routine.
+            NEXT
+
+
+; ----------------------------------------------------------------------
+; PRN [MFORTH] "p-r-n" ( -- )
+;
+; Select the printer as the output device.
+
+            LINKTO(LCD,0,3,'N',"RP")
+PRN:        JMP     ENTER
+            .WORD   ONE,LIT,0F675h,STORE,EXIT
+
+
+; ----------------------------------------------------------------------
 ; SP [MFORTH] ( -- a-addr )
 ;
 ; a-addr is the value of the stack pointer before a-addr was placed on
 ; the stack.
 
-            LINKTO(INSROMTRIG,0,2,'P',"S")
+            LINKTO(PRN,0,2,'P',"S")
 SP:         LXI     H,0
             DAD     SP
             PUSH    H

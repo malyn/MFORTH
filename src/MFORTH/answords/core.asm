@@ -564,12 +564,12 @@ TWOSWAP:    SAVEDE
 ;       represent arguments to and results from name, respectively.
 
 ; : : ( "<spaces>name" -- )
-;   CREATE HIDE ]  -3 ALLOT  195 C, DOCOLON , ; -- JMP DOCOLON
+;   CREATE HIDE ]  CFASIZE NEGATE ALLOT  195 C, DOCOLON , ; -- JMP DOCOLON
 
             LINKTO(TWOSWAP,0,1,03Ah,"")
 COLON:      JMP     ENTER
             .WORD   CREATE,HIDE,RTBRACKET
-            .WORD   LIT,-3,ALLOT,LIT,195,CCOMMA,LIT,DOCOLON,COMMA
+            .WORD   LIT,-CFASIZE,ALLOT,LIT,195,CCOMMA,LIT,DOCOLON,COMMA
             .WORD   EXIT
 
 
@@ -688,11 +688,11 @@ _gtDONE:    PUSH    H           ; Push the flag to the stack.
 ; a-addr is the data-field address corresponding to xt.  An ambiguous
 ; condition exists if xt is not for a word defined via CREATE.
 ;
-; : >BODY ( xt -- a-addr)   3 + ;
+; : >BODY ( xt -- a-addr)   CFASIZE + ;
 
             LINKTO(GREATERTHAN,0,5,'Y',"DOB>")
 TOBODY:     JMP     ENTER
-            .WORD   LIT,3,PLUS,EXIT
+            .WORD   LIT,CFASIZE,PLUS,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -1097,11 +1097,11 @@ CHARS:      NEXT                ; No-op in MFORTH, because chars are 1 byte.
 ;   Place x on the stack.
 ;
 ; : CONSTANT ( x "<spaces>name" -- )
-;   CREATE  -3 ALLOT  195 C, DOCONSTANT ,  , ; -- JMP DOCONSTANT
+;   CREATE  CFASIZE NEGATE ALLOT  195 C, DOCONSTANT ,  , ; -- JMP DOCONSTANT
 
             LINKTO(CHARS,0,8,'T',"NATSNOC")
 CONSTANT:   JMP     ENTER
-            .WORD   CREATE,LIT,-3,ALLOT,LIT,195,CCOMMA,LIT,DOCONSTANT,COMMA
+            .WORD   CREATE,LIT,-CFASIZE,ALLOT,LIT,195,CCOMMA,LIT,DOCONSTANT,COMMA
             .WORD   COMMA,EXIT
 
 
@@ -1152,7 +1152,8 @@ CR:         CALL    STDCALL     ; Call the
 ;   BL WORD   DUP C@ 0= IF ABORT THEN -- TODO: check for >63
 ;   COUNT 2>B  B# 1+ ALLOT  HERE 1-  B# OVER C!
 ;   FORB 1- B@ OVER C! NEXTB  DUP C@ 128 OR SWAP C!
-;   LATEST @ ,  HERE 3 - LATEST !  195 C, DOCREATE , -- JMP DOCREATE
+;   LATEST @ ,  [ PROFILER ] [IF] 0 , [THEN]
+;   HERE HEADERSIZE - LATEST !  195 C, DOCREATE , -- JMP DOCREATE
 ;
 
             LINKTO(CR,0,6,'E',"TAERC")
@@ -1163,7 +1164,11 @@ _create1:   .WORD   COUNT,TWOTOB,BNUMBER,ONEPLUS,ALLOT,HERE,ONEMINUS
 _create2:   .WORD   BQUES,zbranch,_create3,ONEMINUS,BFETCH,OVER,CSTORE
             .WORD       BPLUS,branch,_create2
 _create3:   .WORD   DUP,CFETCH,LIT,128,OR,SWAP,CSTORE
-            .WORD   LATEST,FETCH,COMMA,HERE,LIT,3,MINUS,LATEST,STORE
+            .WORD   LATEST,FETCH,COMMA
+#IFDEF PROFILER
+            .WORD   ZERO,COMMA
+#ENDIF
+            .WORD   HERE,LIT,HEADERSIZE,MINUS,LATEST,STORE
             .WORD       LIT,195,CCOMMA,LIT,DOCREATE,COMMA
             .WORD   EXIT
 
@@ -1255,7 +1260,7 @@ DO:         JMP     ENTER
 ;   R>                  -- Get the new CFA for this def, which also exits the
 ;                       -- the current def since we just popped the defining
 ;                       -- word's address from the return stack.
-;   LATEST @ 3 +        -- Get address of LATEST's CFA.
+;   LATEST @ NFA>CFA    -- Get address of LATEST's CFA.
 ;   195 OVER C!  1+ !   -- Replace CFA with a JMP (195) to the code after DOES>
 ;                       -- which in our implementation is CALL DODOES and then
 ;                       -- the high-level thread after DOES>.
@@ -1269,7 +1274,7 @@ DO:         JMP     ENTER
 DOES:       JMP     ENTER
             .WORD   LIT,pdoes,COMPILECOMMA,LIT,205,CCOMMA,LIT,DODOES,COMMA,EXIT
 pdoes:      JMP     ENTER
-            .WORD   RFROM,LATEST,FETCH,LIT,3,PLUS
+            .WORD   RFROM,LATEST,FETCH,NFATOCFA
             .WORD   LIT,195,OVER,CSTORE,ONEPLUS,STORE,EXIT
 
 
@@ -1336,7 +1341,7 @@ ELSE:       JMP     ENTER
 EMIT:       POP     H           ; Pop the character into HL
             MOV     A,L         ; ..and then move it into A.
             CALL    STDCALL     ; Call the
-            .WORD   04BABh      ; .."LCD character output" routine.
+            .WORD   04B44h      ; .."character output" routine.
             NEXT
 
 
@@ -1429,7 +1434,7 @@ _fill2:     .WORD   DROP,EXIT
 ;   0  LATEST @ >B
 ;   BEGIN
 ;       OVER B FOUND? IF
-;           2DROP  B 3 +  B@ 128 AND 0= 1 OR  EXIT
+;           2DROP  B NFA>CFA  B@ 128 AND 0= 1 OR  EXIT
 ;       THEN
 ;   B 1+ @ DUP >B 0= UNTIL ;
 
@@ -1437,7 +1442,7 @@ _fill2:     .WORD   DROP,EXIT
 FIND:       JMP     ENTER
             .WORD   ZERO,LATEST,FETCH,TOB
 _find1:     .WORD   OVER,B,FOUNDQ,zbranch,_find2
-            .WORD   TWODROP,B,LIT,3,PLUS
+            .WORD   TWODROP,B,NFATOCFA
             .WORD   BFETCH,LIT,128,AND,ZEROEQUALS,ONE,OR,EXIT
 _find2:     .WORD   B,ONEPLUS,FETCH,DUP,TOB,ZEROEQUALS,zbranch,_find1
             .WORD   EXIT
@@ -1940,11 +1945,11 @@ RFETCH:     RSFETCH(H,L)
 ;   definition.  An ambiguous condition exists if RECURSE appears in a
 ;   definition after DOES>.
 ;
-; RECURSE   LATEST @ 3 + , ; IMMEDIATE
+; RECURSE   LATEST @ NFA>CFA , ; IMMEDIATE
 
             LINKTO(RFETCH,1,7,'E',"SRUCER")
 RECURSE:    JMP     ENTER
-            .WORD   LATEST,FETCH,LIT,3,PLUS,COMMA,EXIT
+            .WORD   LATEST,FETCH,NFATOCFA,COMMA,EXIT
 
 
 ; ----------------------------------------------------------------------
@@ -2105,7 +2110,7 @@ SOURCE:     JMP     ENTER
             LINKTO(SOURCE,0,5,'E',"CAPS")
 SPACE:      MVI     A,020h      ; Put the space character in A.
             CALL    STDCALL     ; Call the
-            .WORD   04BABh      ; .."LCD character output" routine.
+            .WORD   04B44h      ; .."character output" routine.
             NEXT
 
 
@@ -2195,7 +2200,7 @@ _type1:     MOV     A,D         ; See if the count is zero by moving D to A
             JZ      _typeDONE   ; We're done if the count is zero.
             MOV     A,M         ; Get the current character.
             CALL    STDCALL     ; Call the
-            .WORD   04BABh      ; .."LCD character output" routine.
+            .WORD   04B44h      ; .."character output" routine.
             INX     H           ; Move to the next character.
             DCX     D           ; Decrement the remaining count.
             JMP     _type1      ; Keep going.
@@ -2443,11 +2448,11 @@ UNTIL:      JMP     ENTER
 ;   for initializing the contents of the reserved cell.
 
 ; : VARIABLE ( "<spaces>name" -- )
-;   CREATE  -3 ALLOT  195 C, DOVARIABLE ,  0 , ; -- JMP DOVARIABLE
+;   CREATE  HEADERSIZE NEGATE ALLOT  195 C, DOVARIABLE ,  0 , ; -- JMP DOVARIABLE
 
             LINKTO(UNTIL,0,8,'E',"LBAIRAV")
 VARIABLE:   JMP     ENTER
-            .WORD   CREATE,LIT,-3,ALLOT,LIT,195,CCOMMA,LIT,DOVARIABLE,COMMA
+            .WORD   CREATE,LIT,-HEADERSIZE,ALLOT,LIT,195,CCOMMA,LIT,DOVARIABLE,COMMA
             .WORD   ZERO,COMMA,EXIT
 
 
@@ -2939,14 +2944,14 @@ ENDLOOP:    JMP     ENTER
 
 
 ; ----------------------------------------------------------------------
-; FOUND? [MFORTH] "found-question" ( c-addr dict-addr -- flag )
+; FOUND? [MFORTH] "found-question" ( c-addr nfa-addr -- flag )
 ;
 ; Compares the counted string c-addr to the name of the dictionary entry
-; pointed to by dict-addr (which points to the length field) and pushes
+; pointed to by nfa-addr (which points to the length field) and pushes
 ; true to the stack if the names are identical (ignoring case), false
 ; otherwise.
 ;
-; : FOUND? ( c-addr dict-addr -- flag )  -- missing the upper/lower conversion
+; : FOUND? ( c-addr nfa-addr -- flag )  -- missing the upper/lower conversion
 ;   OVER C@  OVER C@ 127 AND  <> IF FALSE EXIT THEN
 ;   BEGIN
 ;       OVER C@  OVER C@ 127 AND <> IF FALSE EXIT THEN
@@ -2962,7 +2967,7 @@ ENDLOOP:    JMP     ENTER
 FOUNDQ:     SAVEDE
             POP     D           ; Pop the dictionary pointer.
             POP     H           ; Pop the counted string pointer.
-            LDAX    D           ; Get the dictionary length into A.
+            LDAX    D           ; Get the name length into A.
             ANI     01111111b   ; Strip the immediate bit.
             CMP     M           ; Compare the two lengths+smudge bits.
             JNZ     _foundqFLSE ; Jump if not zero (not equal) to false.
@@ -3142,6 +3147,36 @@ LIT:        LHLX            ; Read constant from instruction stream.
 
 
 ; ----------------------------------------------------------------------
+; NFA>CFA [MFORTH] "n-f-a-to-c-f-a" ( nfa-addr -- cfa-addr )
+;
+; cfa-addr is the Code Field Address for the word whose Name Field Address
+; is nfa-addr.
+;
+; : NFA>CFA ( nfa-addr -- cfa-addr)   HEADERSIZE + ;
+
+            LINKTO(LIT,0,7,'A',"FC>AFN")
+NFATOCFA:   POP     H
+            SKIPHEADER
+            PUSH    H
+            NEXT
+
+
+; ----------------------------------------------------------------------
+; NFA>LFA [MFORTH] "n-f-a-to-l-f-a" ( nfa-addr -- lfa-addr )
+;
+; lfa-addr is the Link Field Address for the word whose Name Field Address
+; is nfa-addr.
+;
+; : NFA>LFA ( nfa-addr -- lfa-addr)   1+ ;
+
+            LINKTO(NFATOCFA,0,7,'A',"FL>AFN")
+NFATOLFA:   POP     H
+            INX     H
+            PUSH    H
+            NEXT
+
+
+; ----------------------------------------------------------------------
 ; NUMBER? [MFORTH] "number-question" ( c-addr u -- c-addr u 0 | n -1 )
 ;
 ; Attempt to convert a string at c-addr of length u into digits, using
@@ -3153,7 +3188,7 @@ LIT:        LHLX            ; Read constant from instruction stream.
 ;   IF DROP 2DROP  R> DROP  0 ELSE
 ;      DROP 2NIP DROP  >R ?NEGATE  -1 THEN ;
 
-            LINKTO(LIT,0,7,'?',"REBMUN")
+            LINKTO(NFATOLFA,0,7,'?',"REBMUN")
 NUMBERQ:    JMP     ENTER
             .WORD   SIGNQ,TOR,TWODUP,ZERO,ZERO,TWOSWAP
             .WORD       TONUMBER,zbranch,_numberq1

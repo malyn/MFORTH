@@ -36,6 +36,14 @@ MFORTH_MINOR    .EQU    9
 
 
 ; ======================================================================
+; MFORTH Configuration Flags
+; ======================================================================
+
+#DEFINE         PROFILER
+
+
+
+; ======================================================================
 ; MFORTH Register Usage
 ; ======================================================================
 ;
@@ -164,6 +172,18 @@ STACKGUARD: .EQU    076h        ; The guard value used to see if a Task
 ; MFORTH Constants
 ; ======================================================================
 
+#IFNDEF PROFILER
+HEADERSIZE: .EQU    1+2         ; Name Length + Link Field
+#DEFINE     SKIPHEADER  INX H\ INX H\ INX H
+#ELSE
+HEADERSIZE: .EQU    1+2+2       ; Name Length + Link Field + Execution Count
+PROFOFFSET: .EQU    1+2         ; Offset from NFA to Execution Count
+#DEFINE     SKIPHEADER  INX H\ INX H\ INX H\ INX H\ INX H
+#ENDIF
+
+CFASIZE:    .EQU    3           ; Size of the Code Field.
+#DEFINE     SKIPCFA INX H\ INX H\ INX H
+
 TIBSIZE:    .EQU    80          ; Length of the Terminal Input Buffer.
 
 WORDOFFSET: .EQU    64          ; Offset from HERE to WORD buffer.
@@ -216,7 +236,9 @@ SAVED:      .EQU    ALTBGN + 42 ; DE is saved here when used as a temporary.
 TICKPREVLEAVE:.EQU  ALTBGN + 44 ; Pointer to the previous LEAVE in a DO..LOOP.
 TICKPREVENDB:.EQU   ALTBGN + 46 ; Pointer to the previous ?ENDB in a FORB..NEXTB
 TICKICB:    .EQU    ALTBGN + 48 ; Address of the current Input Control Block.
-; 14 bytes free.
+PROFILING:  .EQU    ALTBGN + 50 ; Non-zero if the profiler is on.
+PROFILETICKS:.EQU   ALTBGN + 52 ; Number of ticks (4us) for profile run.
+; 10 bytes free.
 ICBSTART:   .EQU    ALTBGN + 64 ; Start of the 8, 8-byte Input Control Blocks.
 FCBSTART:   .EQU    ALTBGN + 128; Start of the 8, 8-byte File Control Blocks.
 ; 128 bytes free.
@@ -340,6 +362,13 @@ INT65:      CALL    INTCALL
 
 INT75:      CALL    INTCALL
             .WORD   0003Ch
+#IFDEF PROFILER
+            PUSH    H
+            LHLD    PROFILETICKS; Get the current profile tick counter.
+            INX     H           ; Add one to the counter.
+            SHLD    PROFILETICKS; And save the counter.
+            POP     H
+#ENDIF
             RET
 
         
@@ -575,7 +604,7 @@ _init1:     LDAX    D           ; Load value from [DE]
             SHLD    BOPSTK      ; ..and store it in in BOPSTK.
             
             ; Initialize LATEST.
-            LXI     H,_latest-3
+            LXI     H,_latest-HEADERSIZE
             SHLD    TICKLATEST
             
             ; Four USER variables are currently in use (SavedSP, Base, B, Bend).
@@ -614,6 +643,10 @@ _init1:     LDAX    D           ; Load value from [DE]
             MVI     L,0ffh      ; Initialize the SP, which begins at xxFF.
             SPHL
             
+            ; Disable the profiler.
+            LXI     H,0
+            SHLD    PROFILING
+            
             ; Enable interrupts and jump to COLD (which never returns).
             EI
             LXI     H,COLD      ; Point W at COLD (needed by ENTER).
@@ -630,7 +663,7 @@ _init1:     LDAX    D           ; Load value from [DE]
 #include "kernel.asm"
 
 ; ANS word sets.
-LINK_CORE       .EQU    3
+LINK_CORE       .EQU    HEADERSIZE
 #include "answords/core.asm"
 
 LINK_COREEXT    .EQU    LAST_CORE
@@ -664,7 +697,14 @@ LINK_MFORTH     .EQU    LAST_BREG
 LINK_TASK       .EQU    LAST_MFORTH
 #include "mforthwords/task.asm"
 
+#IFNDEF PROFILER
 _latest         .EQU    LAST_TASK
+#ELSE
+LINK_PROFILER   .EQU    LAST_TASK
+#include "mforthwords/profiler.asm"
+
+_latest         .EQU    LAST_PROFILER
+#ENDIF
 
 
 
